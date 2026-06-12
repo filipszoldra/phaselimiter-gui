@@ -1,6 +1,6 @@
 # Feature proposal: "Reference EQ" — steer the AI's target tone
 
-> Status: **planned, feasibility confirmed in source.** No C++ engine recompile.
+> Status: **implemented** — macro-tilt (4 band groups), tone only (mid_mean). No C++ engine recompile.
 > Composes with the deferred reference-matching feature ([reference-matching-feature.md](reference-matching-feature.md)).
 
 ## The idea

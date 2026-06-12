@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>phaselimiter-gui — controls reference (EN)</title>
+<style>
+  :root { --bg:#14161a; --card:#1e2228; --fg:#e8eaed; --muted:#9aa3ad; --accent:#5db0ff; --good:#57c98a; --warn:#f0b85a; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:0 0 4rem; background:var(--bg); color:var(--fg);
+         font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+  header { padding:2.5rem 1.5rem 1.5rem; max-width:880px; margin:0 auto; }
+  h1 { margin:0 0 .3rem; font-size:1.9rem; }
+  .lead { color:var(--muted); margin:.2rem 0 0; }
+  main { max-width:880px; margin:0 auto; padding:0 1.5rem; }
+  section { background:var(--card); border:1px solid #2a2f37; border-radius:12px;
+            padding:1.25rem 1.4rem; margin:1.1rem 0; }
+  h2 { margin:.2rem 0 .8rem; font-size:1.3rem; }
+  h2 .tag { font-size:.7rem; font-weight:600; color:var(--bg); background:var(--accent);
+            border-radius:999px; padding:.15rem .55rem; vertical-align:middle; margin-left:.5rem; }
+  h2 .tag.adv { background:var(--warn); }
+  h3 { margin:1.1rem 0 .3rem; font-size:1.05rem; color:var(--accent); }
+  code { background:#0e1014; color:#cfe7ff; padding:.1rem .4rem; border-radius:5px;
+         font-family:ui-monospace,Consolas,Menlo,monospace; font-size:.88em; }
+  .meta { color:var(--muted); font-size:.9rem; margin:.15rem 0 .5rem; }
+  .meta b { color:var(--fg); }
+  table { width:100%; border-collapse:collapse; margin:.6rem 0; font-size:.92rem; }
+  th, td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid #2a2f37; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .pill { display:inline-block; font-size:.78rem; border-radius:6px; padding:.1rem .45rem; }
+  .pill.crunch { background:#3a1f24; color:#ff9aa6; }
+  .pill.clicks { background:#3a2f1a; color:#ffd28a; }
+  .pill.pump  { background:#1f2f3a; color:#8ad0ff; }
+  .pill.smear { background:#2a233a; color:#c4a8ff; }
+  .note { border-left:3px solid var(--accent); padding:.5rem .8rem; margin:.8rem 0;
+          background:#0e1014; border-radius:0 8px 8px 0; color:var(--muted); }
+  .note b { color:var(--fg); }
+  .rec { color:var(--good); font-weight:600; }
+  footer { max-width:880px; margin:2rem auto 0; padding:0 1.5rem; color:var(--muted); font-size:.85rem; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>phaselimiter-gui — controls reference</h1>
+  <p class="lead">Guide to mastering settings and their effect on the audio.
+  The <b>Advanced</b> section targets glitches — crunch, pumping, clicks, smearing —
+  that persist even at gentle loudness and intensity.</p>
+</header>
+
+<main>
+
+  <div class="note">
+    <b>Quick summary.</b> Hearing crunch at <code>-13 LUFS</code> / intensity <code>0.4</code>?
+    That's not loudness — it's the <b>limiter</b>, <b>ceiling</b> and <b>pre-compression</b> stages.
+    Fix them in the <b>Advanced</b> section.
+  </div>
+
+  <!-- ============ BASIC ============ -->
+  <section>
+    <h2>Basic controls <span class="tag">Basic</span></h2>
+
+    <h3>Output directory</h3>
+    <p class="meta">Folder where mastered files are saved (defaults to <code>Downloads</code> / <code>Desktop</code>). Output files get the suffix <code>_output.wav</code>.</p>
+
+    <h3>Target loudness <span class="meta">→ <code>--reference</code></span></h3>
+    <p class="meta"><b>Range:</b> −20 … 0 LUFS &nbsp;·&nbsp; <b>Default:</b> −9 LUFS</p>
+    <p>The biggest lever. Sets how loud the track is pushed before the limiter. Lower (e.g.
+    <code>−13</code> / <code>−14</code>) = less gain into the limiter = less crunch and pumping.
+    <span class="rec">Recommended −12 to −14</span> for music with preserved dynamics.</p>
+
+    <h3>Mastering intensity <span class="meta">→ <code>--mastering5_mastering_level</code></span></h3>
+    <p class="meta"><b>Range:</b> 0.0 … 1.0 &nbsp;·&nbsp; <b>Default:</b> 1.0</p>
+    <p>How strongly AutoMastering5 reshapes the tone toward the learned reference
+    (per-band M/S compressor, tuned by differential-evolution optimisation).
+    Lower = gentler, closer to the original.</p>
+    <div class="note"><b>Note.</b> In <code>mastering5</code> mode (the only mode used here) only this
+    flag has any effect. <code>--mastering_matching_level</code> and
+    <code>--mastering_ms_matching_level</code> apply only to <code>classic</code> mode and are not passed.</div>
+
+    <h3>Preserve bass <span class="meta">→ <code>--erb_eval_func_weighting</code></span></h3>
+    <p>Enables perceptual weighting in the limiter to protect low frequencies from over-limiting.</p>
+  </section>
+
+  <!-- ============ ADVANCED ============ -->
+  <section>
+    <h2>Advanced — glitch reduction <span class="tag adv">Advanced</span></h2>
+    <p class="meta">These stages run <b>independently</b> of loudness and intensity — they can
+    degrade the sound even at gentle basic settings.</p>
+
+    <h3>Limiter only (diagnostic) <span class="meta">→ <code>--mastering false</code></span></h3>
+    <p class="meta"><b>Default:</b> off</p>
+    <p>Skips AutoMastering5, runs only the limiter. Use for A/B diagnosis: if quiet sections
+    stop distorting, the global reference-matching is the culprit — lower
+    <b>Mastering intensity</b> (e.g. to 0.2–0.3). Not a production mode.</p>
+
+    <h3>True-peak ceiling (dB) <span class="meta">→ <code>--ceiling</code></span></h3>
+    <p class="meta"><b>Range:</b> −3.0 … 0.0 dB &nbsp;·&nbsp; <b>Default:</b> −1.0 dB
+    &nbsp;·&nbsp; Target: <span class="pill clicks">clicks</span></p>
+    <p>Maximum inter-sample peak. At <code>0 dB</code>, peaks exceed 0 dBFS after MP3/AAC encoding.
+    <span class="rec">−1.0 dB</span> provides headroom and eliminates most clicks.</p>
+
+    <h3>Limiter oversampling (×) <span class="meta">→ <code>--limiter_internal_oversample</code></span></h3>
+    <p class="meta"><b>Options:</b> 1 / 2 / 4 &nbsp;·&nbsp; <b>Default:</b> 1
+    &nbsp;·&nbsp; Target: <span class="pill crunch">crunch / aliasing</span></p>
+    <p>Hard limiting at 44.1 kHz creates aliasing. Running at <code>2×</code> or <code>4×</code>
+    removes most of it. <span class="rec">Recommended 2×</span>. CPU/RAM scales with the factor.</p>
+
+    <h3>Limiter quality (iterations) <span class="meta">→ <code>--max_iter1</code></span></h3>
+    <p class="meta"><b>Range:</b> 100 … 400 (step 50) &nbsp;·&nbsp; <b>Default:</b> 100
+    &nbsp;·&nbsp; Target: <span class="pill crunch">distortion</span> <span class="pill smear">smearing</span></p>
+    <p>The limiter is an iterative FISTA optimizer. Too few iterations = audible error (crunch)
+    and pre-ringing (transient smearing). <span class="rec">Try 200</span> if you hear distortion.</p>
+
+    <h3>Pre-compression <span class="meta">→ <code>--pre_compression</code></span></h3>
+    <p class="meta"><b>Default:</b> on &nbsp;·&nbsp; Target: <span class="pill pump">pumping</span></p>
+    <p>Loudness compressor running <b>before</b> the limiter. Can be the source of pumping.
+    Uncheck to preserve full dynamics.</p>
+
+    <h3>Pre-comp threshold (dB) <span class="meta">→ <code>--pre_compression_threshold</code></span></h3>
+    <p class="meta"><b>Range:</b> 0 … 18 dB &nbsp;·&nbsp; <b>Default:</b> 6 dB</p>
+    <p>How many dB above measured loudness the pre-compressor activates. Higher = less pumping.</p>
+
+    <h3>Pre-comp window (s) <span class="meta">→ <code>--pre_compression_mean_sec</code></span></h3>
+    <p class="meta"><b>Range:</b> 0.05 … 1.0 s &nbsp;·&nbsp; <b>Default:</b> 0.2 s</p>
+    <p>Averaging window. <span class="rec">Extending to ~0.4 s</span> reduces pumping.</p>
+  </section>
+
+  <!-- ============ ANALYSIS ============ -->
+  <section>
+    <h2>Analysis &amp; suggestions <span class="tag">New</span></h2>
+
+    <h3>Analyze a track &amp; suggest settings</h3>
+    <p>Opens a file picker, measures the chosen audio file (<code>audio_analyzer</code>), and
+    auto-fills every control with gentle values derived from LRA, true-peak and spectral balance.
+    Non-WAV inputs are decoded via <code>ffmpeg</code> automatically.</p>
+    <table>
+      <thead><tr><th>Metric measured</th><th>Controls filled</th></tr></thead>
+      <tbody>
+        <tr><td>Loudness range (LRA)</td><td>Intensity, pre-comp window, target LUFS</td></tr>
+        <tr><td>True-peak</td><td>Ceiling (always ≤ −1.0 dB)</td></tr>
+        <tr><td>Band balance (ERB)</td><td>Preserve bass (if bass dominates)</td></tr>
+      </tbody>
+    </table>
+    <div class="note">After analysis the <b>Detected quiet sections</b> list is also populated
+    from the short-term loudness curve.</div>
+
+    <h3>Before/after report <span class="meta">(double-click a finished row)</span></h3>
+    <p>Opens a dialog with: a <b>metrics scorecard</b> (LUFS, LRA, true-peak, dynamics, stereo,
+    sound quality — input vs. output with warnings), <b>analysis images</b> (spectrogram, spectrum
+    balance, stereo image), and the <b>list of detected quiet sections</b>.</p>
+  </section>
+
+  <!-- ============ SECTIONS ============ -->
+  <section>
+    <h2>Detected quiet sections <span class="tag adv">Advanced</span></h2>
+    <p>The algorithm finds spans where short-term loudness sits ≥9 LU below the track's loud-section
+    reference (95th-percentile of the loudness curve). A global master over-processes these —
+    AutoMastering5 is fitted to whole-song statistics (dominated by loud sections) and boosts
+    near-empty bands during sparse material.</p>
+
+    <h3>Editing the list</h3>
+    <ul>
+      <li><b>+ Add</b> — manually add a section by entering start and end in seconds.</li>
+      <li><b>Remove</b> — delete the selected row.</li>
+    </ul>
+
+    <h3>Section intensity</h3>
+    <p class="meta"><b>Range:</b> 0.0 … 1.0 &nbsp;·&nbsp; <b>Default:</b> 0.25</p>
+    <p>The gentler mastering level used to re-render quiet sections.</p>
+
+    <h3>Section-aware mastering <span class="meta">(checkbox)</span></h3>
+    <p>When enabled and sections are present:</p>
+    <ol>
+      <li>The engine masters the whole track normally (preserves the loudness arc).</li>
+      <li>Each quiet section is re-mastered from the original input with the gentler level.</li>
+      <li>The rescued section is loudness-matched to the global master at that position.</li>
+      <li>It is spliced back with 80 ms cross-fades at the boundaries.</li>
+    </ol>
+    <div class="note">If any rescue step fails, the output falls back to the global master —
+    the base render is never lost.</div>
+  </section>
+
+  <!-- ============ REFERENCE EQ ============ -->
+  <section>
+    <h2>Reference tone (EQ) <span class="tag adv">Advanced</span></h2>
+    <p class="meta">Collapsed expander in the main window.</p>
+    <p>AutoMastering5 targets a <b>reference</b> — a per-ERB-band array of <code>mid_mean</code>
+    values (target mono level in dB): the <b>AI's target tonal curve</b>. The four sliders tilt it
+    without recompiling the engine:</p>
+    <table>
+      <thead><tr><th>Slider</th><th>Frequency range</th><th>Effect at +dB</th></tr></thead>
+      <tbody>
+        <tr><td>Low</td><td>&lt;250 Hz</td><td>Bassier target</td></tr>
+        <tr><td>Low-mid</td><td>250–2000 Hz</td><td>Warmer mids</td></tr>
+        <tr><td>High-mid</td><td>2000–6000 Hz</td><td>More presence / brightness</td></tr>
+        <tr><td>High</td><td>&gt;6000 Hz</td><td>More air</td></tr>
+      </tbody>
+    </table>
+    <p class="meta"><b>Range:</b> ±6 dB (clamped in code) &nbsp;·&nbsp; <b>Default:</b> 0 (no change)</p>
+    <p>The GUI writes a modified copy of <code>mastering_reference.json</code> to a temp file
+    and passes it via <code>--mastering5_mastering_reference_file</code>. The <code>covariance</code>,
+    <code>side_mean</code> and all other fields are preserved verbatim.</p>
+    <div class="note"><b>⚠ Over-boosting an empty band</b> (e.g. +6 dB High on a bright-free track)
+    fights the limiter and can <em>worsen</em> artifacts. Start with ±2 dB and verify with the
+    before/after spectrum image.</div>
+  </section>
+
+  <!-- ============ SYMPTOM TABLE ============ -->
+  <section>
+    <h2>Symptom → fix <span class="tag adv">Cheat sheet</span></h2>
+    <table>
+      <thead><tr><th>What you hear</th><th>First fix</th><th>Then</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="pill clicks">Clicks / crackles</span></td>
+          <td>True-peak ceiling → <b>−1.0 dB</b></td>
+          <td>Check output format (WAV is safest)</td>
+        </tr>
+        <tr>
+          <td><span class="pill crunch">Crunch on peaks</span></td>
+          <td>Limiter oversampling → <b>2×</b></td>
+          <td>Limiter quality → <b>200</b>; lower loudness</td>
+        </tr>
+        <tr>
+          <td><span class="pill pump">Pumping / breathing</span></td>
+          <td>Pre-comp window → <b>0.4 s</b></td>
+          <td>Raise threshold or disable pre-compression</td>
+        </tr>
+        <tr>
+          <td><span class="pill smear">Smearing / loss of clarity</span></td>
+          <td>Limiter quality → <b>200</b></td>
+          <td>Lower mastering intensity</td>
+        </tr>
+        <tr>
+          <td>Wrong tone — too bright or dark</td>
+          <td>Reference tone (EQ) → tilt sliders</td>
+          <td>Start with ±2 dB; verify with before/after report</td>
+        </tr>
+        <tr>
+          <td>Distortion on quiet intro / break</td>
+          <td>Detected sections + section intensity 0.15–0.25</td>
+          <td>Enable Section-aware mastering</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">Change <b>one</b> parameter at a time and compare by ear —
+    otherwise it's hard to hear what actually helped.</div>
+  </section>
+
+</main>
+
+<footer>
+  phaselimiter-gui · controls reference (EN). DSP engine: the
+  <code>phaselimiter</code> project (<a href="https://github.com/ai-mastering/phaselimiter">ai-mastering/phaselimiter</a>).
+  Flag names match the arguments passed to <code>phase_limiter</code> in
+  <code>mastering.go</code>.
+</footer>
+
+</body>
+</html>

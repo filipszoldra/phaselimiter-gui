@@ -51,11 +51,8 @@ func formatSuggestionMessage(a AudioAnalysis, s SuggestedSettings) string {
 
 	secs := detectQuietSections(a.LoudnessTimeSeries, DefaultSectionDetectOptions())
 	if len(secs) > 0 {
-		fmt.Fprintf(&b, "\nDetected %d quiet section(s) a global master may over-process:\n", len(secs))
-		for _, sec := range secs {
-			b.WriteString("• " + sec.String() + "\n")
-		}
-		b.WriteString("(Section rescue is planned; for now you may master those louder parts separately.)")
+		fmt.Fprintf(&b, "\n%d quiet section(s) detected and shown in the \"Detected quiet sections\" list.\n", len(secs))
+		b.WriteString("Enable \"Section-aware mastering\" to re-render them with gentler settings.")
 	} else if len(a.LoudnessTimeSeries) > 0 {
 		b.WriteString("\nNo strongly quiet sections detected — global settings should be fine.")
 	}

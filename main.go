@@ -166,6 +166,49 @@ func main() {
 	preCompWindow.SetValue(0.2)
 	advBox.Add(preCompWindow)
 
+	// Reference-tone EQ: tilt the AI's target tonal curve (mid_mean) per band group.
+	eqExpander, err := gtk.ExpanderNew("Reference tone (EQ) — tilt the AI target (±6 dB)")
+	box.Add(eqExpander)
+	eqBox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
+	eqExpander.Add(eqBox)
+	eqLowLabel, err := gtk.LabelNew("Low (<250 Hz)  dB")
+	eqBox.Add(eqLowLabel)
+	eqLow, err := gtk.SpinButtonNewWithRange(-6, 6, 0.5)
+	eqLow.SetValue(0)
+	eqBox.Add(eqLow)
+	eqLowMidLabel, err := gtk.LabelNew("Low-mid (250–2000 Hz)  dB")
+	eqBox.Add(eqLowMidLabel)
+	eqLowMid, err := gtk.SpinButtonNewWithRange(-6, 6, 0.5)
+	eqLowMid.SetValue(0)
+	eqBox.Add(eqLowMid)
+	eqHighMidLabel, err := gtk.LabelNew("High-mid (2000–6000 Hz)  dB")
+	eqBox.Add(eqHighMidLabel)
+	eqHighMid, err := gtk.SpinButtonNewWithRange(-6, 6, 0.5)
+	eqHighMid.SetValue(0)
+	eqBox.Add(eqHighMid)
+	eqHighLabel, err := gtk.LabelNew("High (>6000 Hz)  dB")
+	eqBox.Add(eqHighLabel)
+	eqHigh, err := gtk.SpinButtonNewWithRange(-6, 6, 0.5)
+	eqHigh.SetValue(0)
+	eqBox.Add(eqHigh)
+
+	// Section display: declared early so the analyzeBtn callback can populate them.
+	var detectedSections []Section
+	secListStore, _ := gtk.ListStoreNew(glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING)
+	secExpander, _ := gtk.ExpanderNew("Detected quiet sections (analyze first)")
+	secBox, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
+	secExpander.Add(secBox)
+
+	addSectionRow := func(s Section) {
+		iter := secListStore.Append()
+		secListStore.Set(iter, []int{0, 1, 2, 3}, []interface{}{
+			fmt.Sprintf("%.1f", s.StartSec),
+			fmt.Sprintf("%.1f", s.EndSec),
+			fmt.Sprintf("%.1f", s.DurationSec()),
+			fmt.Sprintf("%.0f LU", s.GapDB),
+		})
+	}
+
 	// Feature 3: analyze a track and fill all controls with gentle, glitch-avoiding
 	// settings derived from its loudness range, true peak and spectral balance.
 	analyzeBtn, err := gtk.ButtonNewWithLabel("Analyze a track & suggest settings")
@@ -209,10 +252,110 @@ func main() {
 				preComp.SetActive(s.PreCompression)
 				preCompThreshold.SetValue(s.PreCompressionThreshold)
 				preCompWindow.SetValue(s.PreCompressionMeanSec)
+				// Populate section table from the loudness curve.
+				secs := detectQuietSections(a.LoudnessTimeSeries, DefaultSectionDetectOptions())
+				detectedSections = secs
+				secListStore.Clear()
+				for _, sec := range secs {
+					addSectionRow(sec)
+				}
+				if len(secs) > 0 {
+					secExpander.SetLabel(fmt.Sprintf("Detected quiet sections (%d found)", len(secs)))
+					secExpander.SetExpanded(true)
+				} else {
+					secExpander.SetLabel("Detected quiet sections (none found)")
+				}
 				showInfoDialog(win, "Suggested settings applied", formatSuggestionMessage(a, s))
 			})
 		}()
 	})
+
+	// Build section expander content and add it after the Analyze button.
+	secTV, _ := gtk.TreeViewNewWithModel(secListStore)
+	secTV.AppendColumn(createTreeViewColumn("Start (s)", 0))
+	secTV.AppendColumn(createTreeViewColumn("End (s)", 1))
+	secTV.AppendColumn(createTreeViewColumn("Duration (s)", 2))
+	secTV.AppendColumn(createTreeViewColumn("Gap below loud", 3))
+	secBox.Add(secTV)
+
+	secBtnRow, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 4)
+	secBox.Add(secBtnRow)
+
+	addSecBtn, _ := gtk.ButtonNewWithLabel("+ Add")
+	secBtnRow.Add(addSecBtn)
+	addSecBtn.Connect("clicked", func() {
+		dlg, _ := gtk.DialogNew()
+		dlg.SetTitle("Add section")
+		dlg.SetTransientFor(win)
+		dlg.SetModal(true)
+		dlg.AddButton("Cancel", gtk.RESPONSE_CANCEL)
+		dlg.AddButton("Add", gtk.RESPONSE_ACCEPT)
+		content, _ := dlg.GetContentArea()
+		grid, _ := gtk.GridNew()
+		grid.SetColumnSpacing(8)
+		grid.SetRowSpacing(4)
+		grid.SetMarginTop(8)
+		grid.SetMarginBottom(8)
+		grid.SetMarginStart(8)
+		grid.SetMarginEnd(8)
+		sLbl, _ := gtk.LabelNew("Start (s):")
+		grid.Attach(sLbl, 0, 0, 1, 1)
+		sSpin, _ := gtk.SpinButtonNewWithRange(0, 9999, 1)
+		grid.Attach(sSpin, 1, 0, 1, 1)
+		eLbl, _ := gtk.LabelNew("End (s):")
+		grid.Attach(eLbl, 0, 1, 1, 1)
+		eSpin, _ := gtk.SpinButtonNewWithRange(0, 9999, 1)
+		eSpin.SetValue(30)
+		grid.Attach(eSpin, 1, 1, 1, 1)
+		content.Add(grid)
+		dlg.ShowAll()
+		if dlg.Run() == gtk.RESPONSE_ACCEPT {
+			start := sSpin.GetValue()
+			end := eSpin.GetValue()
+			if end > start {
+				sec := Section{StartSec: start, EndSec: end}
+				detectedSections = append(detectedSections, sec)
+				addSectionRow(sec)
+			}
+		}
+		dlg.Destroy()
+	})
+
+	removeSecBtn, _ := gtk.ButtonNewWithLabel("Remove")
+	secBtnRow.Add(removeSecBtn)
+	removeSecBtn.Connect("clicked", func() {
+		sel, err := secTV.GetSelection()
+		if err != nil {
+			return
+		}
+		_, iter, ok := sel.GetSelected()
+		if !ok {
+			return
+		}
+		path, err := secListStore.GetPath(iter)
+		if err != nil {
+			return
+		}
+		indices := path.GetIndices()
+		if len(indices) > 0 {
+			idx := indices[0]
+			if idx >= 0 && idx < len(detectedSections) {
+				detectedSections = append(detectedSections[:idx], detectedSections[idx+1:]...)
+			}
+		}
+		secListStore.Remove(iter)
+	})
+
+	secIntensityLabel, _ := gtk.LabelNew("Section intensity — gentler level for rescued sections")
+	secBox.Add(secIntensityLabel)
+	secIntensity, _ := gtk.SpinButtonNewWithRange(0, 1, 0.05)
+	secIntensity.SetValue(0.25)
+	secBox.Add(secIntensity)
+
+	secMasteringCheck, _ := gtk.CheckButtonNewWithLabel("Section-aware mastering (re-render quiet sections gently)")
+	secBox.Add(secMasteringCheck)
+
+	box.Add(secExpander)
 
 	notes, err := gtk.LabelNew(`Drop audio files.
 
@@ -337,6 +480,17 @@ Notes
 			m.PreCompression = preComp.GetActive()
 			m.PreCompressionThreshold = preCompThreshold.GetValue()
 			m.PreCompressionMeanSec = preCompWindow.GetValue()
+
+			m.ReferenceBasePath = filepath.Join(getExecDir(), "phaselimiter/resource/mastering_reference.json")
+			m.ReferenceEQ = ReferenceEQ{
+				LowDB:     eqLow.GetValue(),
+				LowMidDB:  eqLowMid.GetValue(),
+				HighMidDB: eqHighMid.GetValue(),
+				HighDB:    eqHigh.GetValue(),
+			}
+			m.SectionMasteringEnable = secMasteringCheck.GetActive()
+			m.Sections = append([]Section(nil), detectedSections...) // copy slice
+			m.SectionIntensity = secIntensity.GetValue()
 
 			masteringRunner.Add(m)
 

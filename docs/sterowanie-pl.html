@@ -151,6 +151,100 @@
     redukuje pompowanie.</p>
   </section>
 
+  <!-- ============ ANALIZA I SUGESTIE ============ -->
+  <section>
+    <h2>Analiza i sugestie <span class="tag">Nowe</span></h2>
+
+    <h3>Analizuj utwór i zasugeruj ustawienia <span class="meta">(Analyze a track &amp; suggest settings)</span></h3>
+    <p>Przycisk otwiera okno wyboru pliku. Po wybraniu dowolnego pliku audio (WAV, MP3, FLAC…)
+    program mierzy go narzędziem <code>audio_analyzer</code> (wbudowanym w silnik) i na podstawie
+    wyników wypełnia <b>wszystkie kontrolki</b> łagodnymi, glitch‑unikającymi wartościami:</p>
+    <table>
+      <thead><tr><th>Co mierzę</th><th>Co ustawiam</th></tr></thead>
+      <tbody>
+        <tr><td>Zakres głośności (LRA)</td><td>Intensywność, okno pre‑komp., docelowy LUFS</td></tr>
+        <tr><td>True‑peak</td><td>Sufit (zawsze ≤ −1,0 dB)</td></tr>
+        <tr><td>Balans pasm (ERB)</td><td>Zachowaj bas (jeśli bas dominuje)</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>Format wejścia.</b> Pliki inne niż WAV są automatycznie dekodowane
+    przez <code>ffmpeg</code> do tymczasowego WAV przed analizą — nie musisz nic konwertować.</div>
+    <div class="note"><b>Wynik → sekcje ciche.</b> Jeśli utwór ma fragmenty znacznie cichsze
+    od reszty (intro, break), pojawiają się one w liście <b>Wykryte sekcje ciche</b> poniżej
+    przycisku, gotowe do rescue‑masteringu.</div>
+
+    <h3>Raport przed/po <span class="meta">(Before/after report — dwuklik gotowego wiersza)</span></h3>
+    <p>Po zakończeniu masteringu kliknij dwukrotnie gotowy wiersz w kolejce. Otworzy się okno z:</p>
+    <ul style="margin:.4rem 0 0 1.2rem">
+      <li><b>Tabelą pomiarów</b> — Loudness (LUFS), LRA, True‑peak, Dynamika, Stereo, Sound Quality 2,
+          input vs. output z ostrzeżeniami (np. ⚠ dynamics squashed, ⚠ true‑peak > 0 dBFS).</li>
+      <li><b>Obrazami spektrogramu, rozkładu widma i obrazu stereo</b> — input po lewej, output po prawej.</li>
+      <li><b>Listą wykrytych sekcji cichych</b> z opisem, które fragmenty mogą być nadmiernie przetworzone.</li>
+    </ul>
+  </section>
+
+  <!-- ============ SEKCJE CICHE ============ -->
+  <section>
+    <h2>Wykryte sekcje ciche <span class="tag adv">Zaawansowane</span></h2>
+    <p class="meta">Dostępne po kliknięciu <b>Analizuj utwór i zasugeruj ustawienia</b>.</p>
+    <p>Algorytm szuka fragmentów, gdzie krótkoterminowa głośność jest co najmniej
+    <b>9 LU poniżej</b> typowego poziomu głośnego fragmentu (95. percentyl krzywej).
+    Takie miejsca globalny mastering zwykle nadmiernie przetwarza — AutoMastering5
+    dopasowuje się do statystyk całości i podbija niemal puste pasma w cichych momentach.</p>
+
+    <h3>Edycja listy sekcji</h3>
+    <p>Lista jest uzupełniana automatycznie po analizie. Możesz:</p>
+    <ul style="margin:.4rem 0 0 1.2rem">
+      <li><b>+ Add</b> — ręcznie dodaj sekcję wpisując start i koniec w sekundach.</li>
+      <li><b>Remove</b> — usuń zaznaczony wiersz.</li>
+    </ul>
+
+    <h3>Intensywność sekcji <span class="meta">→ <code>--mastering5_mastering_level</code> (dla sekcji)</span></h3>
+    <p class="meta"><b>Zakres:</b> 0,0 … 1,0 &nbsp;·&nbsp; <b>Domyślnie:</b> 0,25</p>
+    <p>Delikatniejszy poziom masteringu używany tylko do re‑renderowania cichych fragmentów
+    (global master zachowuje swój poziom intensywności).</p>
+
+    <h3>Section-aware mastering <span class="meta">(checkbox)</span></h3>
+    <p>Gdy zaznaczony i lista sekcji nie jest pusta:</p>
+    <ol style="margin:.4rem 0 0 1.2rem">
+      <li>Silnik masteruje cały utwór normalnie (zachowuje łuk głośności).</li>
+      <li>Każdą cichą sekcję masteruje ponownie z <b>delikatniejszą intensywnością</b>
+          (osobno, z wyciętego fragmentu wejściowego).</li>
+      <li>Uratowana sekcja jest wyrównana głośnościowo do global mastera w tym miejscu.</li>
+      <li>Wkleja ją z powrotem z 80 ms cross‑fade na granicach.</li>
+    </ol>
+    <div class="note"><b>Jeśli rescue nie powiodło się</b> (brak ffmpeg, błąd silnika), plik
+    wynikowy pozostaje global masterem — nigdy nie tracisz bazy.</div>
+  </section>
+
+  <!-- ============ TON REFERENCYJNY EQ ============ -->
+  <section>
+    <h2>Ton referencyjny (EQ) <span class="tag adv">Zaawansowane</span></h2>
+    <p class="meta">Kontrolka <b>Reference tone (EQ)</b> w zwiniętej sekcji — rozwiń, żeby zobaczyć suwaki.</p>
+    <p>AutoMastering5 dopasowuje brzmienie do wyuczonego <b>wzorca referencyjnego</b>.
+    Wzorzec to tablica wartości <code>mid_mean</code> (docelowy poziom każdego pasma ERB w dB) —
+    innymi słowy: <b>docelowa krzywa tonalna AI</b>. Te cztery suwaki pozwalają ją <em>przechylić</em>
+    bez przebudowania silnika:</p>
+    <table>
+      <thead><tr><th>Suwak</th><th>Zakres częst.</th><th>Efekt +dB</th></tr></thead>
+      <tbody>
+        <tr><td>Low</td><td>&lt;250 Hz</td><td>AI celuje w bassowszy dźwięk</td></tr>
+        <tr><td>Low-mid</td><td>250–2000 Hz</td><td>cieplejszy środek</td></tr>
+        <tr><td>High-mid</td><td>2000–6000 Hz</td><td>bardziej obecność/jasność</td></tr>
+        <tr><td>High</td><td>&gt;6000 Hz</td><td>więcej powietrza</td></tr>
+      </tbody>
+    </table>
+    <p class="meta"><b>Zakres:</b> ±6 dB (ograniczone w kodzie) &nbsp;·&nbsp; <b>Domyślnie:</b> 0 (brak zmiany)</p>
+    <p>GUI modyfikuje pasmo <code>mid_mean</code> w pliku <code>mastering_reference.json</code>,
+    zapisuje kopię tymczasową i przekazuje ją silnikowi przez
+    <code>--mastering5_mastering_reference_file</code>. Pola <code>covariance</code>,
+    <code>side_mean</code> i inne pozostają niezmienione.</p>
+    <div class="note"><b>⚠ Zbyt duże wzmocnienie pustego pasma</b> (np. +6 dB High przy nagraniu
+    bez wysokich harmonicznych) walczy z limiterem i może <em>pogorszyć</em> artefakty.
+    Zmiana ±2 dB zazwyczaj jest wystarczająco słyszalna. Przy 0 dB na wszystkich suwakach
+    zachowanie jest identyczne jak przed tą funkcją.</div>
+  </section>
+
   <!-- ============ TABELA OBJAW -> LEK ============ -->
   <section>
     <h2>Objaw → lekarstwo <span class="tag adv">Ściąga</span></h2>
@@ -176,6 +270,16 @@
           <td><span class="pill smear">Rozmycie / utrata klarowności</span></td>
           <td>Jakość limitera → <b>200</b></td>
           <td>Niższa intensywność masteringu</td>
+        </tr>
+        <tr>
+          <td>Zła barwa — za jasno lub za ciemno</td>
+          <td>Ton referencyjny (EQ) → przechyl suwaki</td>
+          <td>Zacznij od ±2 dB; użyj raportu przed/po do weryfikacji</td>
+        </tr>
+        <tr>
+          <td>Distortion / szum na cichym intro lub break</td>
+          <td>Analiza → <b>Sekcje ciche</b> + niższa intensywność sekcji (0,15–0,25)</td>
+          <td>Włącz <b>Section-aware mastering</b>; jeśli wciąż widoczne — skróć próg pre‑komp.</td>
         </tr>
       </tbody>
     </table>
