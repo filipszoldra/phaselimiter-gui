@@ -73,12 +73,16 @@
     wpychanego w limiter = mniej chrupania i pompowania. <span class="rec">Zalecane −12 do −14</span>
     dla muzyki z zachowaną dynamiką.</p>
 
-    <h3>Intensywność masteringu <span class="meta">(Mastering intensity)</span></h3>
+    <h3>Intensywność masteringu <span class="meta">(Mastering intensity) → flaga <code>--mastering5_mastering_level</code></span></h3>
     <p class="meta"><b>Zakres:</b> 0,0 … 1,0 &nbsp;·&nbsp; <b>Domyślnie:</b> 1,0</p>
-    <p>Steruje trzema flagami naraz: <code>--mastering_matching_level</code>,
-    <code>--mastering_ms_matching_level</code> oraz <code>--mastering5_mastering_level</code>.
-    Określa, jak mocno algorytm przekształca brzmienie w stronę wyuczonego wzorca
-    (korekcja pasmowa + kompresja M/S). Niżej = delikatniej, bliżej oryginału.</p>
+    <p>Określa, jak mocno algorytm AutoMastering5 przekształca brzmienie w stronę
+    wyuczonego wzorca (korekcja pasmowa + kompresja M/S, dobierana optymalizacją
+    różnicowo‑ewolucyjną). Niżej = delikatniej, bliżej oryginału.</p>
+    <div class="note"><b>Uwaga techniczna.</b> W trybie <code>mastering5</code> (jedyny używany
+    przez tę aplikację) działa <b>tylko</b> ta jedna flaga. Pokrewne
+    <code>--mastering_matching_level</code> i <code>--mastering_ms_matching_level</code>
+    mają znaczenie wyłącznie w trybie <code>classic</code> — tutaj są nieaktywne, więc
+    aplikacja ich nie przekazuje.</div>
 
     <h3>Zachowaj bas <span class="meta">(Preserve bass) → flaga <code>--erb_eval_func_weighting</code></span></h3>
     <p>Włącza percepcyjne ważenie błędu limitera tak, aby chronić niskie częstotliwości
@@ -94,6 +98,14 @@
     <h2>Zaawansowane — redukcja glitchy <span class="tag adv">Zaawansowane</span></h2>
     <p class="meta">Te etapy działają <b>niezależnie</b> od głośności i intensywności —
     dlatego potrafią psuć dźwięk nawet przy spokojnych ustawieniach podstawowych.</p>
+
+    <h3>Tylko limiter (diagnostyka) <span class="meta">(Limiter only) → <code>--mastering false</code></span></h3>
+    <p class="meta"><b>Domyślnie:</b> wyłączone</p>
+    <p>Pomija etap AutoMastering5 (dopasowanie do wzorca) i uruchamia <b>sam limiter</b>.
+    Służy do diagnozy: jeśli po włączeniu tej opcji ciche fragmenty (intra, przejścia)
+    przestają być zniekształcone, to winowajcą jest właśnie globalne dopasowanie
+    AutoMastering5 — wtedy obniż <b>Intensywność masteringu</b> (np. do 0,2–0,3). To nie
+    jest tryb produkcyjny, tylko test A/B.</p>
 
     <h3>Sufit true‑peak (dB) <span class="meta">(True‑peak ceiling) → <code>--ceiling</code></span></h3>
     <p class="meta"><b>Zakres:</b> −3,0 … 0,0 dB &nbsp;·&nbsp; <b>Domyślnie:</b> −1,0 dB

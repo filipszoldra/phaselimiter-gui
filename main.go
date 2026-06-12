@@ -120,6 +120,9 @@ func main() {
 	advBox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
 	advExpander.Add(advBox)
 
+	limiterOnly, err := gtk.CheckButtonNewWithLabel("Limiter only (diagnostic — bypass auto-mastering)")
+	advBox.Add(limiterOnly)
+
 	ceilingLabel, err := gtk.LabelNew("True-peak ceiling (dB) — lower reduces clicks")
 	advBox.Add(ceilingLabel)
 	ceiling, err := gtk.SpinButtonNewWithRange(-3.0, 0.0, 0.1)
@@ -216,6 +219,7 @@ Notes
 			m.Level = masteringLevel.GetValue()
 			m.BassPreservation = bassPreservation.GetActive()
 
+			m.LimiterOnly = limiterOnly.GetActive()
 			m.Ceiling = ceiling.GetValue()
 			oversampleVal, _ := strconv.Atoi(oversample.GetActiveText())
 			if oversampleVal < 1 {

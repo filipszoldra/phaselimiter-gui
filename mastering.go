@@ -25,8 +25,9 @@ type Mastering struct {
 	PhaselimiterPath   string
 	SoundQuality2Cache string
 	Loudness           float64
-	Level              float64
+	Level              float64 // AutoMastering5 reference-matching strength (mastering5_mastering_level)
 	BassPreservation   bool
+	LimiterOnly        bool // diagnostic: bypass AutoMastering5, run the limiter only
 	// Advanced (glitch-reduction) controls. These act on the limiter / ceiling /
 	// pre-compression stages, which run regardless of how gentle Loudness/Level are.
 	Ceiling                 float64 // true-peak ceiling in dB (e.g. -1.0); reduces clicks
@@ -61,12 +62,7 @@ func (m Mastering) execute(update chan Mastering) {
 		"--input", m.Input,
 		"--output", m.Output,
 		"--ffmpeg", m.Ffmpeg,
-		"--mastering", "true",
-		"--mastering_mode", "mastering5",
 		"--sound_quality2_cache", m.SoundQuality2Cache,
-		"--mastering_matching_level", formatFloat(m.Level),
-		"--mastering_ms_matching_level", formatFloat(m.Level),
-		"--mastering5_mastering_level", formatFloat(m.Level),
 		"--erb_eval_func_weighting", formatBool(m.BassPreservation),
 		"--reference", formatFloat(m.Loudness),
 		// Advanced glitch-reduction stages (see Mastering struct comments).
@@ -76,6 +72,20 @@ func (m Mastering) execute(update chan Mastering) {
 		"--pre_compression", formatBool(m.PreCompression),
 		"--pre_compression_threshold", formatFloat(m.PreCompressionThreshold),
 		"--pre_compression_mean_sec", formatFloat(m.PreCompressionMeanSec),
+	}
+
+	// AutoMastering5 (reference matching). In mastering5 mode only
+	// --mastering5_mastering_level has any effect; --mastering_matching_level and
+	// --mastering_ms_matching_level apply only to "classic" mode, so they are not
+	// passed here. "Limiter only" disables matching entirely for A/B diagnosis.
+	if m.LimiterOnly {
+		args = append(args, "--mastering", "false")
+	} else {
+		args = append(args,
+			"--mastering", "true",
+			"--mastering_mode", "mastering5",
+			"--mastering5_mastering_level", formatFloat(m.Level),
+		)
 	}
 	cmd := exec.Command(m.PhaselimiterPath, args...)
 	CmdHideWindow(cmd)
