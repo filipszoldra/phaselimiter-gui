@@ -177,6 +177,7 @@ func (m Mastering) rescueSection(s Section, idx int) error {
 	secOutput := fmt.Sprintf("%s.sec%d_out.wav", m.Output, idx)
 	secGain := fmt.Sprintf("%s.sec%d_gain.wav", m.Output, idx)
 	for _, f := range []string{secInput, secOutput, secGain} {
+		f := f // capture loop variable for defer (Go 1.21 range-var semantics)
 		defer os.Remove(f)
 	}
 
