@@ -31,7 +31,7 @@ type SectionDetectOptions struct {
 
 func DefaultSectionDetectOptions() SectionDetectOptions {
 	return SectionDetectOptions{
-		DropDB:              9,
+		DropDB:              6,
 		MinDurationSec:      2.0,
 		BridgeSec:           1.0,
 		ReferencePercentile: 0.95,
