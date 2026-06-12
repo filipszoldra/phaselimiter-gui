@@ -69,6 +69,8 @@ func main() {
 	go masteringRunner.Run()
 	masteringId := 0
 
+	analyzer := NewAnalyzer(getExecDir(), "ffmpeg")
+
 	gtk.Init(nil)
 
 	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -160,6 +162,54 @@ func main() {
 	preCompWindow.SetValue(0.2)
 	advBox.Add(preCompWindow)
 
+	// Feature 3: analyze a track and fill all controls with gentle, glitch-avoiding
+	// settings derived from its loudness range, true peak and spectral balance.
+	analyzeBtn, err := gtk.ButtonNewWithLabel("Analyze a track & suggest settings")
+	box.Add(analyzeBtn)
+	analyzeBtnLabel := "Analyze a track & suggest settings"
+	analyzeBtn.Connect("clicked", func() {
+		chooser, err := gtk.FileChooserDialogNewWith2Buttons(
+			"Choose a track to analyze", win, gtk.FILE_CHOOSER_ACTION_OPEN,
+			"Cancel", gtk.RESPONSE_CANCEL, "Analyze", gtk.RESPONSE_ACCEPT)
+		if err != nil {
+			return
+		}
+		filename := ""
+		if chooser.Run() == gtk.RESPONSE_ACCEPT {
+			filename = chooser.GetFilename()
+		}
+		chooser.Destroy()
+		if filename == "" {
+			return
+		}
+
+		analyzeBtn.SetSensitive(false)
+		analyzeBtn.SetLabel("Analyzing…")
+		go func() {
+			a, analyzeErr := analyzer.Analyze(filename)
+			glib.IdleAdd(func() {
+				analyzeBtn.SetSensitive(true)
+				analyzeBtn.SetLabel(analyzeBtnLabel)
+				if analyzeErr != nil {
+					showInfoDialog(win, "Analysis failed",
+						"Could not analyze the track:\n"+analyzeErr.Error())
+					return
+				}
+				s := suggestSettings(a)
+				loudness.SetValue(s.Loudness)
+				masteringLevel.SetValue(s.Level)
+				bassPreservation.SetActive(s.BassPreservation)
+				ceiling.SetValue(s.Ceiling)
+				oversample.SetActive(oversampleIndex(s.LimiterOversample))
+				limiterQuality.SetValue(float64(s.LimiterMaxIter))
+				preComp.SetActive(s.PreCompression)
+				preCompThreshold.SetValue(s.PreCompressionThreshold)
+				preCompWindow.SetValue(s.PreCompressionMeanSec)
+				showInfoDialog(win, "Suggested settings applied", formatSuggestionMessage(a, s))
+			})
+		}()
+	})
+
 	notes, err := gtk.LabelNew(`Drop audio files.
 
 Process
@@ -168,7 +218,8 @@ Process
 
 Notes
 - Same algorithm with bakuage.com/aimastering.com
-- No internet access`)
+- No internet access
+- Double-click a finished row for a before/after report`)
 	box.Add(notes)
 
 	ls, err := gtk.ListStoreNew(glib.TYPE_INT, glib.TYPE_STRING,
@@ -179,6 +230,58 @@ Notes
 	tv.AppendColumn(createTreeViewColumn("output file", COLUMN_OUTPUT))
 	tv.AppendColumn(createTreeViewColumn("status", COLUMN_STATUS))
 	box.Add(tv)
+
+	// Features 2/4b: double-click a finished row to open a before/after report
+	// (scorecard + spectrogram/spectrum/stereo images + detected quiet sections).
+	tv.Connect("row-activated", func() {
+		sel, err := tv.GetSelection()
+		if err != nil {
+			return
+		}
+		_, iter, ok := sel.GetSelected()
+		if !ok {
+			return
+		}
+		getStr := func(col int) string {
+			v, err := ls.GetValue(iter, col)
+			if err != nil {
+				return ""
+			}
+			gv, err := v.GoValue()
+			if err != nil {
+				return ""
+			}
+			s, _ := gv.(string)
+			return s
+		}
+		if getStr(COLUMN_STATUS) != string(MasteringStatusSucceeded) {
+			showInfoDialog(win, "Report not ready",
+				"Open the before/after report after mastering finishes (status: succeeded).")
+			return
+		}
+		inputPath := getStr(COLUMN_INPUT)
+		outputPath := getStr(COLUMN_OUTPUT)
+		go func() {
+			tmpIn, _ := os.MkdirTemp("", "pl_report_in_*")
+			tmpOut, _ := os.MkdirTemp("", "pl_report_out_*")
+			aIn, imgIn, e1 := analyzer.AnalyzeWithImages(inputPath, tmpIn)
+			aOut, imgOut, e2 := analyzer.AnalyzeWithImages(outputPath, tmpOut)
+			glib.IdleAdd(func() {
+				defer os.RemoveAll(tmpIn)
+				defer os.RemoveAll(tmpOut)
+				if e1 != nil {
+					showInfoDialog(win, "Report failed", "Input analysis failed:\n"+e1.Error())
+					return
+				}
+				if e2 != nil {
+					showInfoDialog(win, "Report failed", "Output analysis failed:\n"+e2.Error())
+					return
+				}
+				secs := detectQuietSections(aIn.LoudnessTimeSeries, DefaultSectionDetectOptions())
+				showReportDialog(win, aIn, aOut, imgIn, imgOut, secs)
+			})
+		}()
+	})
 
 	var destInData = func(lbi *gtk.Window,
 		context *gdk.DragContext,

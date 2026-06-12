@@ -74,6 +74,19 @@ gone, no audible level jump or tonal seam at boundaries.
 2. **Blend model:** rescue-in-place (recommended — gentle, preserves current sound) vs.
    fully independent per-section masters concatenated (more character, higher seam/arc risk).
 
+## Related analysis features (implemented / planned)
+These were built/planned on top of the bundled analysis binaries (`audio_analyzer` etc.), no
+engine recompile — see the approved plan and feature docs:
+- **F3 "Analyze & suggest"** (implemented) — fills the global controls from input metrics; the
+  gentle suggestions are the first thing to try before any section work (this plan's Gate).
+- **F4a auto-detect sections** (implemented core, `sections.go`) — derives quiet spans from
+  `loudness_time_series`; this is now the entry point for **Open decision #1** (auto + editable),
+  replacing the old "Phase 3 ffmpeg scan".
+- **F2/F4b before-after report** (implemented) — the verification loop (see the loudness arc and
+  confirm a rescue matched levels / didn't over-limit).
+- **Reference EQ** (planned, [reference-eq-feature.md](reference-eq-feature.md)) — a tweaked
+  reference can serve as the shared target across sections (Phase 2).
+
 ## References (engine source)
 - Pipeline / Normalize / start_at-end_at: `../phaselimiter/src/phase_limiter/main.cpp`
 - AutoMastering5 (global reference matching): `../phaselimiter/src/phase_limiter/auto_mastering5.cpp`

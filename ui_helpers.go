@@ -1,0 +1,63 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/gotk3/gotk3/gtk"
+)
+
+// oversampleIndex maps a limiter-oversample factor to the combo box index
+// (the combo lists "1", "2", "4").
+func oversampleIndex(v int) int {
+	switch v {
+	case 4:
+		return 2
+	case 2:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// showInfoDialog shows a modal informational message.
+func showInfoDialog(parent gtk.IWindow, title, msg string) {
+	d := gtk.MessageDialogNew(parent, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, "%s", msg)
+	d.SetTitle(title)
+	d.Run()
+	d.Destroy()
+}
+
+// formatSuggestionMessage renders the applied settings, the reasoning, and any
+// auto-detected quiet sections for the F3 "Analyze & suggest" dialog.
+func formatSuggestionMessage(a AudioAnalysis, s SuggestedSettings) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Input: %.1f LUFS, LRA %.1f LU, true-peak %.1f dBFS, dynamics %.1f\n\n",
+		a.Loudness, a.LoudnessRange, a.TruePeak, a.Dynamics)
+
+	b.WriteString("Applied settings:\n")
+	fmt.Fprintf(&b, "• Target loudness: %.0f LUFS\n", s.Loudness)
+	fmt.Fprintf(&b, "• Intensity: %.2f\n", s.Level)
+	fmt.Fprintf(&b, "• Preserve bass: %v\n", s.BassPreservation)
+	fmt.Fprintf(&b, "• Ceiling: %.1f dB · Oversample: %d× · Iterations: %d\n",
+		s.Ceiling, s.LimiterOversample, s.LimiterMaxIter)
+	fmt.Fprintf(&b, "• Pre-comp: %v · threshold %.1f dB · window %.2f s\n\n",
+		s.PreCompression, s.PreCompressionThreshold, s.PreCompressionMeanSec)
+
+	b.WriteString("Why:\n")
+	for _, n := range s.Notes {
+		b.WriteString("• " + n + "\n")
+	}
+
+	secs := detectQuietSections(a.LoudnessTimeSeries, DefaultSectionDetectOptions())
+	if len(secs) > 0 {
+		fmt.Fprintf(&b, "\nDetected %d quiet section(s) a global master may over-process:\n", len(secs))
+		for _, sec := range secs {
+			b.WriteString("• " + sec.String() + "\n")
+		}
+		b.WriteString("(Section rescue is planned; for now you may master those louder parts separately.)")
+	} else if len(a.LoudnessTimeSeries) > 0 {
+		b.WriteString("\nNo strongly quiet sections detected — global settings should be fine.")
+	}
+	return b.String()
+}
