@@ -74,10 +74,10 @@ func (m Mastering) buildEngineArgs(inputPath, outputPath string, level float64) 
 	}
 
 	args := []string{
-		"--input", inputPath,
-		"--output", outputPath,
-		"--ffmpeg", m.Ffmpeg,
-		"--sound_quality2_cache", m.SoundQuality2Cache,
+		"--input", toShortPath(inputPath),
+		"--output", toShortPath(outputPath),
+		"--ffmpeg", toShortPath(m.Ffmpeg),
+		"--sound_quality2_cache", toShortPath(m.SoundQuality2Cache),
 		"--erb_eval_func_weighting", formatBool(m.BassPreservation),
 		"--reference", formatFloat(m.Loudness),
 		"--ceiling", formatFloat(m.Ceiling),
