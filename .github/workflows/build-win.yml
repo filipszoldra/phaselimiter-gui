@@ -25,6 +25,7 @@ jobs:
           rm libtermcap*
           rm libtextstyle*
       - run: mv licenses /tmp/results
+      - run: mkdir -p /tmp/results/share/glib-2.0/schemas && cp /usr/x86_64-w64-mingw32/sys-root/mingw/share/glib-2.0/schemas/gschemas.compiled /tmp/results/share/glib-2.0/schemas/
       - uses: actions/upload-artifact@v4
         with:
           name: build-results

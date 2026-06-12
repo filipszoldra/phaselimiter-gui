@@ -71,6 +71,10 @@ func main() {
 
 	analyzer := NewAnalyzer(getExecDir(), "ffmpeg")
 
+	// GTK on Windows requires GSettings schemas; point GLib to the bundled copy
+	// (placed at share/glib-2.0/schemas/gschemas.compiled by the CI workflow).
+	os.Setenv("GSETTINGS_SCHEMA_DIR",
+		filepath.Join(getExecDir(), "share", "glib-2.0", "schemas"))
 	gtk.Init(nil)
 
 	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -78,7 +82,7 @@ func main() {
 		log.Fatal("Unable to create window:", err)
 	}
 	win.SetTitle("phaselimiter-gui")
-	win.SetDefaultSize(400, 400)
+	win.SetDefaultSize(720, 600)
 	win.Connect("destroy", func() {
 		masteringRunner.Terminate()
 		gtk.MainQuit()
