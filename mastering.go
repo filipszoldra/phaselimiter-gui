@@ -190,6 +190,19 @@ func (m Mastering) rescueSection(s Section, idx int) error {
 		return fmt.Errorf("extract section input: %w", err)
 	}
 
+	// Measure how loud the global master sounds in this region BEFORE running the engine.
+	// If the content is nearly silent (< -20 LUFS), the engine would need to apply massive
+	// gain to reach the target loudness, causing distortion on the quiet build-up.
+	// The global master already handles near-silence correctly — skip rescue.
+	globalLUFS, err := measureSegmentLUFS(m.Ffmpeg, m.Output, s.StartSec, s.EndSec)
+	if err != nil {
+		return fmt.Errorf("measure global LUFS: %w", err)
+	}
+	if globalLUFS < -20 {
+		fmt.Printf("section %d: skipping rescue (globalLUFS=%.1f dB, near-silent — global master is fine)\n", idx, globalLUFS)
+		return nil
+	}
+
 	// Master the section with the gentler section intensity.
 	sArgs, sCleanup := m.buildEngineArgs(secInput, secOutput, m.SectionIntensity)
 	defer sCleanup()
@@ -200,10 +213,7 @@ func (m Mastering) rescueSection(s Section, idx int) error {
 	}
 
 	// Loudness-match the rescued section to the global master's level at that spot.
-	globalLUFS, err := measureSegmentLUFS(m.Ffmpeg, m.Output, s.StartSec, s.EndSec)
-	if err != nil {
-		return fmt.Errorf("measure global LUFS: %w", err)
-	}
+	// globalLUFS was already measured above — reuse it.
 	sectionLUFS, err := measureFileLUFS(m.Ffmpeg, secOutput)
 	if err != nil {
 		return fmt.Errorf("measure section LUFS: %w", err)
@@ -292,27 +302,63 @@ func applyGainDB(ffmpegPath, inputPath, outputPath string, gainDB float64) error
 }
 
 // spliceSectionIntoGlobal replaces [startSec, endSec] of globalPath with sectionPath,
-// using short fade-in/out on the section edges to smooth the transitions.
+// using true mixing crossfades (amix) so there is no amplitude dip at the edit points.
 // The result overwrites globalPath in place.
 func spliceSectionIntoGlobal(ffmpegPath, globalPath, sectionPath string, startSec, endSec float64) error {
 	fade := 0.08 // seconds
 	dur := endSec - startSec
-	fadeOutStart := dur - fade
-	if fadeOutStart < fade {
-		// Very short section: reduce fade so both fit.
+	if dur < fade*4 {
 		fade = dur / 4
-		fadeOutStart = dur - fade
+	}
+	// Limit start crossfade to available pre-content.
+	if startSec > 0 && startSec < fade {
+		fade = startSec
 	}
 
+	secBodyEnd := dur - fade
 	tmp := globalPath + ".splice.tmp.wav"
 
-	filter := fmt.Sprintf(
-		"[0:a]atrim=end=%.3f,asetpts=PTS-STARTPTS[pre];"+
-			"[1:a]afade=t=in:st=0:d=%.3f,afade=t=out:st=%.3f:d=%.3f,asetpts=PTS-STARTPTS[sec];"+
-			"[0:a]atrim=start=%.3f,asetpts=PTS-STARTPTS[post];"+
-			"[pre][sec][post]concat=n=3:v=0:a=1[out]",
-		startSec, fade, fadeOutStart, fade, endSec,
-	)
+	var filter string
+	if startSec < 0.001 {
+		// No pre segment (section starts at the very beginning of the file).
+		// Only crossfade the section's end into the post.
+		// sec_body + amix(sec_tail, post_head) + post_body
+		filter = fmt.Sprintf(
+			"[1:a]atrim=end=%.3f,asetpts=PTS-STARTPTS[sec_body];"+
+				"[1:a]atrim=start=%.3f,asetpts=PTS-STARTPTS,afade=t=out:st=0:d=%.3f[sec_tail];"+
+				"[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=%.3f[post_head];"+
+				"[sec_tail][post_head]amix=inputs=2:normalize=0[cf_end];"+
+				"[0:a]atrim=start=%.3f,asetpts=PTS-STARTPTS[post_body];"+
+				"[sec_body][cf_end][post_body]concat=n=3:v=0:a=1[out]",
+			secBodyEnd,
+			secBodyEnd, fade,
+			endSec, endSec+fade, fade,
+			endSec+fade,
+		)
+	} else {
+		// Normal case: crossfade both the start and end of the section.
+		// pre_body + amix(pre_tail, sec_head) + sec_body + amix(sec_tail, post_head) + post_body
+		preFadeStart := startSec - fade
+		filter = fmt.Sprintf(
+			"[0:a]atrim=end=%.3f,asetpts=PTS-STARTPTS[pre_body];"+
+				"[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS,afade=t=out:st=0:d=%.3f[pre_tail];"+
+				"[1:a]atrim=end=%.3f,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=%.3f[sec_head];"+
+				"[pre_tail][sec_head]amix=inputs=2:normalize=0[cf_start];"+
+				"[1:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS[sec_body];"+
+				"[1:a]atrim=start=%.3f,asetpts=PTS-STARTPTS,afade=t=out:st=0:d=%.3f[sec_tail];"+
+				"[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=%.3f[post_head];"+
+				"[sec_tail][post_head]amix=inputs=2:normalize=0[cf_end];"+
+				"[0:a]atrim=start=%.3f,asetpts=PTS-STARTPTS[post_body];"+
+				"[pre_body][cf_start][sec_body][cf_end][post_body]concat=n=5:v=0:a=1[out]",
+			preFadeStart,
+			preFadeStart, startSec, fade,
+			fade, fade,
+			fade, secBodyEnd,
+			secBodyEnd, fade,
+			endSec, endSec+fade, fade,
+			endSec+fade,
+		)
+	}
 
 	cmd := exec.Command(ffmpegPath, "-y",
 		"-i", globalPath, "-i", sectionPath,
