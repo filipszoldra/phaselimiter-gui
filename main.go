@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -28,6 +29,24 @@ func getExecDir() string {
 		log.Fatal(err)
 	}
 	return filepath.Dir(ex)
+}
+
+// findFfmpeg returns an absolute path to ffmpeg. It checks beside the exe first
+// (the expected install layout), then falls back to the system PATH. Using an
+// absolute path avoids Go 1.19+'s refusal to run executables found in "."
+// (exec: "ffmpeg": cannot run executable found relative to current directory).
+func findFfmpeg() string {
+	beside := filepath.Join(getExecDir(), "ffmpeg")
+	if runtime.GOOS == "windows" {
+		beside += ".exe"
+	}
+	if _, err := os.Stat(beside); err == nil {
+		return beside
+	}
+	if p, err := exec.LookPath("ffmpeg"); err == nil {
+		return p
+	}
+	return "ffmpeg"
 }
 
 func getDefaultOutputDir() string {
@@ -69,7 +88,8 @@ func main() {
 	go masteringRunner.Run()
 	masteringId := 0
 
-	analyzer := NewAnalyzer(getExecDir(), "ffmpeg")
+	ffmpegPath := findFfmpeg()
+	analyzer := NewAnalyzer(getExecDir(), ffmpegPath)
 
 	// GTK on Windows requires GSettings schemas; point GLib to the bundled copy
 	// (placed at share/glib-2.0/schemas/gschemas.compiled by the CI workflow).
@@ -103,13 +123,13 @@ func main() {
 	entry.SetText(getDefaultOutputDir())
 	box.Add(entry)
 
-	loudnessLabel, err := gtk.LabelNew("Target loudness")
+	loudnessLabel, err := gtk.LabelNew("Target loudness (LUFS, −20 … 0, default −9)")
 	box.Add(loudnessLabel)
 	loudness, err := gtk.SpinButtonNewWithRange(-20, 0.0, 0.01)
 	loudness.SetValue(-9)
 	box.Add(loudness)
 
-	masteringLevelLabel, err := gtk.LabelNew("Mastering intensity")
+	masteringLevelLabel, err := gtk.LabelNew("Mastering intensity (0.0 … 1.0, default 1.0)")
 	box.Add(masteringLevelLabel)
 	masteringLevel, err := gtk.SpinButtonNewWithRange(0.0, 1.0, 0.01)
 	masteringLevel.SetValue(1)
@@ -129,13 +149,13 @@ func main() {
 	limiterOnly, err := gtk.CheckButtonNewWithLabel("Limiter only (diagnostic — bypass auto-mastering)")
 	advBox.Add(limiterOnly)
 
-	ceilingLabel, err := gtk.LabelNew("True-peak ceiling (dB) — lower reduces clicks")
+	ceilingLabel, err := gtk.LabelNew("True-peak ceiling (dB, −3 … 0, default −1) — lower reduces clicks")
 	advBox.Add(ceilingLabel)
 	ceiling, err := gtk.SpinButtonNewWithRange(-3.0, 0.0, 0.1)
 	ceiling.SetValue(-1.0)
 	advBox.Add(ceiling)
 
-	oversampleLabel, err := gtk.LabelNew("Limiter oversampling (×) — higher reduces crunch")
+	oversampleLabel, err := gtk.LabelNew("Limiter oversampling (×, default 1) — higher reduces crunch")
 	advBox.Add(oversampleLabel)
 	oversample, err := gtk.ComboBoxTextNew()
 	oversample.AppendText("1")
@@ -144,7 +164,7 @@ func main() {
 	oversample.SetActive(0)
 	advBox.Add(oversample)
 
-	limiterQualityLabel, err := gtk.LabelNew("Limiter quality (iterations) — higher = cleaner, slower")
+	limiterQualityLabel, err := gtk.LabelNew("Limiter quality (iterations, 100 … 400, default 100) — higher = cleaner, slower")
 	advBox.Add(limiterQualityLabel)
 	limiterQuality, err := gtk.SpinButtonNewWithRange(100, 400, 50)
 	limiterQuality.SetValue(100)
@@ -154,13 +174,13 @@ func main() {
 	preComp.SetActive(true)
 	advBox.Add(preComp)
 
-	preCompThresholdLabel, err := gtk.LabelNew("Pre-comp threshold (dB) — higher = more dynamics")
+	preCompThresholdLabel, err := gtk.LabelNew("Pre-comp threshold (dB, 0 … 18, default 6) — higher = more dynamics")
 	advBox.Add(preCompThresholdLabel)
 	preCompThreshold, err := gtk.SpinButtonNewWithRange(0, 18, 0.5)
 	preCompThreshold.SetValue(6)
 	advBox.Add(preCompThreshold)
 
-	preCompWindowLabel, err := gtk.LabelNew("Pre-comp window (s) — longer = less pumping")
+	preCompWindowLabel, err := gtk.LabelNew("Pre-comp window (s, 0.05 … 1.0, default 0.2) — longer = less pumping")
 	advBox.Add(preCompWindowLabel)
 	preCompWindow, err := gtk.SpinButtonNewWithRange(0.05, 1.0, 0.05)
 	preCompWindow.SetValue(0.2)
@@ -171,22 +191,22 @@ func main() {
 	box.Add(eqExpander)
 	eqBox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
 	eqExpander.Add(eqBox)
-	eqLowLabel, err := gtk.LabelNew("Low (<250 Hz)  dB")
+	eqLowLabel, err := gtk.LabelNew("Low (<250 Hz)  dB  (±6, default 0)")
 	eqBox.Add(eqLowLabel)
 	eqLow, err := gtk.SpinButtonNewWithRange(-6, 6, 0.5)
 	eqLow.SetValue(0)
 	eqBox.Add(eqLow)
-	eqLowMidLabel, err := gtk.LabelNew("Low-mid (250–2000 Hz)  dB")
+	eqLowMidLabel, err := gtk.LabelNew("Low-mid (250–2000 Hz)  dB  (±6, default 0)")
 	eqBox.Add(eqLowMidLabel)
 	eqLowMid, err := gtk.SpinButtonNewWithRange(-6, 6, 0.5)
 	eqLowMid.SetValue(0)
 	eqBox.Add(eqLowMid)
-	eqHighMidLabel, err := gtk.LabelNew("High-mid (2000–6000 Hz)  dB")
+	eqHighMidLabel, err := gtk.LabelNew("High-mid (2000–6000 Hz)  dB  (±6, default 0)")
 	eqBox.Add(eqHighMidLabel)
 	eqHighMid, err := gtk.SpinButtonNewWithRange(-6, 6, 0.5)
 	eqHighMid.SetValue(0)
 	eqBox.Add(eqHighMid)
-	eqHighLabel, err := gtk.LabelNew("High (>6000 Hz)  dB")
+	eqHighLabel, err := gtk.LabelNew("High (>6000 Hz)  dB  (±6, default 0)")
 	eqBox.Add(eqHighLabel)
 	eqHigh, err := gtk.SpinButtonNewWithRange(-6, 6, 0.5)
 	eqHigh.SetValue(0)
@@ -346,7 +366,7 @@ func main() {
 		secListStore.Remove(iter)
 	})
 
-	secIntensityLabel, _ := gtk.LabelNew("Section intensity — gentler level for rescued sections")
+	secIntensityLabel, _ := gtk.LabelNew("Section intensity (0 … 1, default 0.25) — gentler level for rescued sections")
 	secBox.Add(secIntensityLabel)
 	secIntensity, _ := gtk.SpinButtonNewWithRange(0, 1, 0.05)
 	secIntensity.SetValue(0.25)
@@ -450,7 +470,7 @@ Notes
 			m.Status = MasteringStatusWaiting
 			m.Id = masteringId
 			masteringId += 1
-			m.Ffmpeg = "ffmpeg"
+			m.Ffmpeg = ffmpegPath
 			m.PhaselimiterPath = filepath.Join(getExecDir(), "phaselimiter/bin/phase_limiter")
 			m.SoundQuality2Cache = filepath.Join(getExecDir(), "phaselimiter/resource/sound_quality2_cache")
 
