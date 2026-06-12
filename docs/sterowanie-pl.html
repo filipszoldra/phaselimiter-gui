@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>phaselimiter-gui — opis kontrolek (PL)</title>
+<style>
+  :root { --bg:#14161a; --card:#1e2228; --fg:#e8eaed; --muted:#9aa3ad; --accent:#5db0ff; --good:#57c98a; --warn:#f0b85a; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:0 0 4rem; background:var(--bg); color:var(--fg);
+         font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+  header { padding:2.5rem 1.5rem 1.5rem; max-width:880px; margin:0 auto; }
+  h1 { margin:0 0 .3rem; font-size:1.9rem; }
+  .lead { color:var(--muted); margin:.2rem 0 0; }
+  main { max-width:880px; margin:0 auto; padding:0 1.5rem; }
+  section { background:var(--card); border:1px solid #2a2f37; border-radius:12px;
+            padding:1.25rem 1.4rem; margin:1.1rem 0; }
+  h2 { margin:.2rem 0 .8rem; font-size:1.3rem; }
+  h2 .tag { font-size:.7rem; font-weight:600; color:var(--bg); background:var(--accent);
+            border-radius:999px; padding:.15rem .55rem; vertical-align:middle; margin-left:.5rem; }
+  h2 .tag.adv { background:var(--warn); }
+  h3 { margin:1.1rem 0 .3rem; font-size:1.05rem; color:var(--accent); }
+  code { background:#0e1014; color:#cfe7ff; padding:.1rem .4rem; border-radius:5px;
+         font-family:ui-monospace,Consolas,Menlo,monospace; font-size:.88em; }
+  .meta { color:var(--muted); font-size:.9rem; margin:.15rem 0 .5rem; }
+  .meta b { color:var(--fg); }
+  table { width:100%; border-collapse:collapse; margin:.6rem 0; font-size:.92rem; }
+  th, td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid #2a2f37; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .pill { display:inline-block; font-size:.78rem; border-radius:6px; padding:.1rem .45rem; }
+  .pill.crunch { background:#3a1f24; color:#ff9aa6; }
+  .pill.clicks { background:#3a2f1a; color:#ffd28a; }
+  .pill.pump  { background:#1f2f3a; color:#8ad0ff; }
+  .pill.smear { background:#2a233a; color:#c4a8ff; }
+  .note { border-left:3px solid var(--accent); padding:.5rem .8rem; margin:.8rem 0;
+          background:#0e1014; border-radius:0 8px 8px 0; color:var(--muted); }
+  .note b { color:var(--fg); }
+  .rec { color:var(--good); font-weight:600; }
+  footer { max-width:880px; margin:2rem auto 0; padding:0 1.5rem; color:var(--muted); font-size:.85rem; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>phaselimiter-gui — opis kontrolek</h1>
+  <p class="lead">Przewodnik po ustawieniach masteringu i ich wpływie na dźwięk.
+  Sekcja <b>Zaawansowane</b> służy do usuwania „glitchy”, które zostają nawet przy
+  spokojnym poziomie głośności i intensywności.</p>
+</header>
+
+<main>
+
+  <div class="note">
+    <b>Skrót dla niecierpliwych.</b> Jeśli słyszysz trzaski, chrupanie albo „pompowanie”
+    mimo ustawienia np. <code>-13 LUFS</code> i intensywności <code>0,4</code> — to nie wina
+    głośności. Winne są etapy <b>limitera</b>, <b>sufitu (ceiling)</b> i <b>pre‑kompresji</b>.
+    Ich kontrolki znajdziesz w sekcji <b>Zaawansowane</b> poniżej.
+  </div>
+
+  <!-- ============ PODSTAWOWE ============ -->
+  <section>
+    <h2>Ustawienia podstawowe <span class="tag">Podstawowe</span></h2>
+
+    <h3>Katalog wyjściowy <span class="meta">(Output directory)</span></h3>
+    <p class="meta">Folder, do którego zapisywane są zmasterowane pliki
+    (domyślnie <code>Pobrane</code> / <code>Pulpit</code>). Plik wynikowy otrzymuje
+    przyrostek <code>_output.wav</code>.</p>
+
+    <h3>Docelowa głośność <span class="meta">(Target loudness) → flaga <code>--reference</code></span></h3>
+    <p class="meta"><b>Zakres:</b> −20 … 0 LUFS &nbsp;·&nbsp; <b>Domyślnie:</b> −9 LUFS</p>
+    <p>Najważniejszy „duży” regulator. Określa, jak głośno ma być wyrównany utwór przed
+    limiterem. Niższa wartość (np. <code>−13</code> / <code>−14</code>) = mniej wzmocnienia
+    wpychanego w limiter = mniej chrupania i pompowania. <span class="rec">Zalecane −12 do −14</span>
+    dla muzyki z zachowaną dynamiką.</p>
+
+    <h3>Intensywność masteringu <span class="meta">(Mastering intensity)</span></h3>
+    <p class="meta"><b>Zakres:</b> 0,0 … 1,0 &nbsp;·&nbsp; <b>Domyślnie:</b> 1,0</p>
+    <p>Steruje trzema flagami naraz: <code>--mastering_matching_level</code>,
+    <code>--mastering_ms_matching_level</code> oraz <code>--mastering5_mastering_level</code>.
+    Określa, jak mocno algorytm przekształca brzmienie w stronę wyuczonego wzorca
+    (korekcja pasmowa + kompresja M/S). Niżej = delikatniej, bliżej oryginału.</p>
+
+    <h3>Zachowaj bas <span class="meta">(Preserve bass) → flaga <code>--erb_eval_func_weighting</code></span></h3>
+    <p>Włącza percepcyjne ważenie błędu limitera tak, aby chronić niskie częstotliwości
+    przed nadmiernym ograniczaniem.</p>
+
+    <div class="note"><b>Uwaga.</b> Jeżeli zjechałeś już z głośnością i intensywnością,
+    a artefakty zostają — zostaw te suwaki w spokoju i przejdź do sekcji
+    <b>Zaawansowane</b>. To tam są właściwe lekarstwa.</div>
+  </section>
+
+  <!-- ============ ZAAWANSOWANE ============ -->
+  <section>
+    <h2>Zaawansowane — redukcja glitchy <span class="tag adv">Zaawansowane</span></h2>
+    <p class="meta">Te etapy działają <b>niezależnie</b> od głośności i intensywności —
+    dlatego potrafią psuć dźwięk nawet przy spokojnych ustawieniach podstawowych.</p>
+
+    <h3>Sufit true‑peak (dB) <span class="meta">(True‑peak ceiling) → <code>--ceiling</code></span></h3>
+    <p class="meta"><b>Zakres:</b> −3,0 … 0,0 dB &nbsp;·&nbsp; <b>Domyślnie:</b> −1,0 dB
+    &nbsp;·&nbsp; Cel: <span class="pill clicks">trzaski / przesterowania</span></p>
+    <p>Maksymalny poziom szczytu międzypróbkowego (true‑peak). Przy <code>0 dB</code> limiter
+    celuje dokładnie w 0 dBFS, a po konwersji/kodowaniu (zwłaszcza MP3/AAC) szczyty
+    międzypróbkowe „wyskakują” ponad zero i słychać <b>trzaski</b>. Ustawienie
+    <span class="rec">−1,0 dB</span> daje zapas i eliminuje większość kliknięć.</p>
+
+    <h3>Nadpróbkowanie limitera (×) <span class="meta">(Limiter oversampling) → <code>--limiter_internal_oversample</code></span></h3>
+    <p class="meta"><b>Opcje:</b> 1 / 2 / 4 &nbsp;·&nbsp; <b>Domyślnie:</b> 1
+    &nbsp;·&nbsp; Cel: <span class="pill crunch">chrupanie / aliasing</span></p>
+    <p>Twarde limitowanie przy 44,1 kHz tworzy składowe powyżej częstotliwości Nyquista,
+    które „zawijają się” z powrotem jako szorstkie, nieharmoniczne <b>chrupanie</b>.
+    Praca limitera w <code>2×</code> lub <code>4×</code> usuwa większość tego aliasingu.
+    <span class="rec">Zalecane 2×</span>. Koszt: większe zużycie CPU i RAM.</p>
+
+    <h3>Jakość limitera (iteracje) <span class="meta">(Limiter quality) → <code>--max_iter1</code></span></h3>
+    <p class="meta"><b>Zakres:</b> 100 … 400 (co 50) &nbsp;·&nbsp; <b>Domyślnie:</b> 100
+    &nbsp;·&nbsp; Cel: <span class="pill crunch">zniekształcenia</span>
+    <span class="pill smear">rozmycie</span></p>
+    <p>Limiter to iteracyjny optymalizator (FISTA), który stopniowo „dociska” sygnał do
+    sufitu. Zbyt mała liczba iteracji = optymalizacja nie zdąży się zbiec = zostaje słyszalny
+    błąd (chrupanie) i pre‑ringing (rozmycie transjentów). Wyższa wartość = czystszy wynik,
+    ale dłuższe przetwarzanie. <span class="rec">Spróbuj 200</span> jeśli słyszysz zniekształcenia.</p>
+
+    <h3>Pre‑kompresja <span class="meta">(Pre‑compression) → <code>--pre_compression</code></span></h3>
+    <p class="meta"><b>Domyślnie:</b> włączona &nbsp;·&nbsp;
+    Cel: <span class="pill pump">pompowanie / oddychanie</span></p>
+    <p>Kompresor w dziedzinie głośności, działający <b>przed</b> limiterem. Wyrównuje
+    najgłośniejsze fragmenty. Bywa źródłem <b>pompowania</b>. Odznacz, aby zachować pełną
+    dynamikę i usunąć efekt oddychania.</p>
+
+    <h3>Próg pre‑kompresji (dB) <span class="meta">→ <code>--pre_compression_threshold</code></span></h3>
+    <p class="meta"><b>Zakres:</b> 0 … 18 dB &nbsp;·&nbsp; <b>Domyślnie:</b> 6 dB</p>
+    <p>O ile dB ponad zmierzoną głośność zaczyna działać pre‑kompresor. Wyższa wartość =
+    kompresor reaguje rzadziej = <b>więcej dynamiki</b> i mniej pompowania.</p>
+
+    <h3>Okno pre‑kompresji (s) <span class="meta">→ <code>--pre_compression_mean_sec</code></span></h3>
+    <p class="meta"><b>Zakres:</b> 0,05 … 1,0 s &nbsp;·&nbsp; <b>Domyślnie:</b> 0,2 s</p>
+    <p>Długość okna uśredniania. Krótkie okno (0,2 s) potrafi „oddychać” na basie i
+    transjentach. <span class="rec">Wydłużenie do ~0,4 s</span> wygładza działanie i
+    redukuje pompowanie.</p>
+  </section>
+
+  <!-- ============ TABELA OBJAW -> LEK ============ -->
+  <section>
+    <h2>Objaw → lekarstwo <span class="tag adv">Ściąga</span></h2>
+    <table>
+      <thead><tr><th>Co słyszysz</th><th>Najpierw zmień</th><th>Potem</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="pill clicks">Trzaski / kliknięcia</span></td>
+          <td>Sufit true‑peak → <b>−1,0 dB</b></td>
+          <td>Sprawdź format wyjścia (WAV jest najbezpieczniejszy)</td>
+        </tr>
+        <tr>
+          <td><span class="pill crunch">Chrupanie na szczytach</span></td>
+          <td>Nadpróbkowanie limitera → <b>2×</b></td>
+          <td>Jakość limitera → <b>200</b>; niższa głośność</td>
+        </tr>
+        <tr>
+          <td><span class="pill pump">Pompowanie / oddychanie</span></td>
+          <td>Okno pre‑komp. → <b>0,4 s</b></td>
+          <td>Próg pre‑komp. wyżej lub wyłącz pre‑kompresję</td>
+        </tr>
+        <tr>
+          <td><span class="pill smear">Rozmycie / utrata klarowności</span></td>
+          <td>Jakość limitera → <b>200</b></td>
+          <td>Niższa intensywność masteringu</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">Zmieniaj <b>jeden</b> parametr naraz i porównuj odsłuchowo —
+    inaczej trudno usłyszeć, co faktycznie pomogło.</div>
+  </section>
+
+</main>
+
+<footer>
+  phaselimiter-gui · dokumentacja kontrolek (PL). Silnik DSP: projekt
+  <code>phaselimiter</code> (<a href="https://github.com/ai-mastering/phaselimiter">ai-mastering/phaselimiter</a>).
+  Nazwy flag odpowiadają argumentom przekazywanym do <code>phase_limiter</code> w pliku
+  <code>mastering.go</code>.
+</footer>
+
+</body>
+</html>

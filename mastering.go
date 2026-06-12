@@ -27,9 +27,17 @@ type Mastering struct {
 	Loudness           float64
 	Level              float64
 	BassPreservation   bool
-	Progression        float64
-	Status             MasteringStatus
-	Message            string
+	// Advanced (glitch-reduction) controls. These act on the limiter / ceiling /
+	// pre-compression stages, which run regardless of how gentle Loudness/Level are.
+	Ceiling                 float64 // true-peak ceiling in dB (e.g. -1.0); reduces clicks
+	LimiterOversample       int     // 1/2/4; higher reduces aliasing "crunch"
+	LimiterMaxIter          int     // limiter optimizer outer iterations; higher = cleaner
+	PreCompression          bool    // pre-compression on/off
+	PreCompressionThreshold float64 // dB over loudness; higher = more dynamics
+	PreCompressionMeanSec   float64 // smoothing window; longer = less pumping
+	Progression             float64
+	Status                  MasteringStatus
+	Message                 string
 }
 
 type MasteringRunner struct {
@@ -61,6 +69,13 @@ func (m Mastering) execute(update chan Mastering) {
 		"--mastering5_mastering_level", formatFloat(m.Level),
 		"--erb_eval_func_weighting", formatBool(m.BassPreservation),
 		"--reference", formatFloat(m.Loudness),
+		// Advanced glitch-reduction stages (see Mastering struct comments).
+		"--ceiling", formatFloat(m.Ceiling),
+		"--limiter_internal_oversample", strconv.Itoa(m.LimiterOversample),
+		"--max_iter1", strconv.Itoa(m.LimiterMaxIter),
+		"--pre_compression", formatBool(m.PreCompression),
+		"--pre_compression_threshold", formatFloat(m.PreCompressionThreshold),
+		"--pre_compression_mean_sec", formatFloat(m.PreCompressionMeanSec),
 	}
 	cmd := exec.Command(m.PhaselimiterPath, args...)
 	CmdHideWindow(cmd)

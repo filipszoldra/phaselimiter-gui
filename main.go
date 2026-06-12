@@ -112,6 +112,51 @@ func main() {
 	bassPreservation, err := gtk.CheckButtonNewWithLabel("Preserve bass")
 	box.Add(bassPreservation)
 
+	// Advanced (glitch-reduction) section — collapsed by default. These act on the
+	// limiter / ceiling / pre-compression stages, which produce crunch/clicks/pumping
+	// even at gentle loudness & intensity.
+	advExpander, err := gtk.ExpanderNew("Advanced (glitch reduction)")
+	box.Add(advExpander)
+	advBox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
+	advExpander.Add(advBox)
+
+	ceilingLabel, err := gtk.LabelNew("True-peak ceiling (dB) — lower reduces clicks")
+	advBox.Add(ceilingLabel)
+	ceiling, err := gtk.SpinButtonNewWithRange(-3.0, 0.0, 0.1)
+	ceiling.SetValue(-1.0)
+	advBox.Add(ceiling)
+
+	oversampleLabel, err := gtk.LabelNew("Limiter oversampling (×) — higher reduces crunch")
+	advBox.Add(oversampleLabel)
+	oversample, err := gtk.ComboBoxTextNew()
+	oversample.AppendText("1")
+	oversample.AppendText("2")
+	oversample.AppendText("4")
+	oversample.SetActive(0)
+	advBox.Add(oversample)
+
+	limiterQualityLabel, err := gtk.LabelNew("Limiter quality (iterations) — higher = cleaner, slower")
+	advBox.Add(limiterQualityLabel)
+	limiterQuality, err := gtk.SpinButtonNewWithRange(100, 400, 50)
+	limiterQuality.SetValue(100)
+	advBox.Add(limiterQuality)
+
+	preComp, err := gtk.CheckButtonNewWithLabel("Pre-compression (uncheck to remove pumping)")
+	preComp.SetActive(true)
+	advBox.Add(preComp)
+
+	preCompThresholdLabel, err := gtk.LabelNew("Pre-comp threshold (dB) — higher = more dynamics")
+	advBox.Add(preCompThresholdLabel)
+	preCompThreshold, err := gtk.SpinButtonNewWithRange(0, 18, 0.5)
+	preCompThreshold.SetValue(6)
+	advBox.Add(preCompThreshold)
+
+	preCompWindowLabel, err := gtk.LabelNew("Pre-comp window (s) — longer = less pumping")
+	advBox.Add(preCompWindowLabel)
+	preCompWindow, err := gtk.SpinButtonNewWithRange(0.05, 1.0, 0.05)
+	preCompWindow.SetValue(0.2)
+	advBox.Add(preCompWindow)
+
 	notes, err := gtk.LabelNew(`Drop audio files.
 
 Process
@@ -170,6 +215,17 @@ Notes
 			m.Loudness = loudness.GetValue()
 			m.Level = masteringLevel.GetValue()
 			m.BassPreservation = bassPreservation.GetActive()
+
+			m.Ceiling = ceiling.GetValue()
+			oversampleVal, _ := strconv.Atoi(oversample.GetActiveText())
+			if oversampleVal < 1 {
+				oversampleVal = 1
+			}
+			m.LimiterOversample = oversampleVal
+			m.LimiterMaxIter = int(limiterQuality.GetValue())
+			m.PreCompression = preComp.GetActive()
+			m.PreCompressionThreshold = preCompThreshold.GetValue()
+			m.PreCompressionMeanSec = preCompWindow.GetValue()
 
 			masteringRunner.Add(m)
 
