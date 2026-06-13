@@ -115,7 +115,10 @@ func main() {
 	win.DragDestSet(gtk.DEST_DEFAULT_ALL, []gtk.TargetEntry{*targets}, gdk.ACTION_LINK)
 
 	box, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
-	win.Add(box)
+	scroll, _ := gtk.ScrolledWindowNew(nil, nil)
+	scroll.SetPolicy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
+	scroll.Add(box)
+	win.Add(scroll)
 
 	entryLabel, err := gtk.LabelNew("Output directory")
 	box.Add(entryLabel)
@@ -340,6 +343,78 @@ func main() {
 		}
 		dlg.Destroy()
 	})
+
+	editSecBtn, _ := gtk.ButtonNewWithLabel("Edit")
+	secBtnRow.Add(editSecBtn)
+
+	openEditDialog := func() {
+		sel, err := secTV.GetSelection()
+		if err != nil {
+			return
+		}
+		_, iter, ok := sel.GetSelected()
+		if !ok {
+			return
+		}
+		path, err := secListStore.GetPath(iter)
+		if err != nil {
+			return
+		}
+		indices := path.GetIndices()
+		if len(indices) == 0 {
+			return
+		}
+		idx := indices[0]
+		if idx < 0 || idx >= len(detectedSections) {
+			return
+		}
+		existing := detectedSections[idx]
+
+		dlg, _ := gtk.DialogNew()
+		dlg.SetTitle("Edit section")
+		dlg.SetTransientFor(win)
+		dlg.SetModal(true)
+		dlg.AddButton("Cancel", gtk.RESPONSE_CANCEL)
+		dlg.AddButton("Save", gtk.RESPONSE_ACCEPT)
+		content, _ := dlg.GetContentArea()
+		grid, _ := gtk.GridNew()
+		grid.SetColumnSpacing(8)
+		grid.SetRowSpacing(4)
+		grid.SetMarginTop(8)
+		grid.SetMarginBottom(8)
+		grid.SetMarginStart(8)
+		grid.SetMarginEnd(8)
+		sLbl, _ := gtk.LabelNew("Start (s):")
+		grid.Attach(sLbl, 0, 0, 1, 1)
+		sSpin, _ := gtk.SpinButtonNewWithRange(0, 9999, 1)
+		sSpin.SetValue(existing.StartSec)
+		grid.Attach(sSpin, 1, 0, 1, 1)
+		eLbl, _ := gtk.LabelNew("End (s):")
+		grid.Attach(eLbl, 0, 1, 1, 1)
+		eSpin, _ := gtk.SpinButtonNewWithRange(0, 9999, 1)
+		eSpin.SetValue(existing.EndSec)
+		grid.Attach(eSpin, 1, 1, 1, 1)
+		content.Add(grid)
+		dlg.ShowAll()
+		if dlg.Run() == gtk.RESPONSE_ACCEPT {
+			start := sSpin.GetValue()
+			end := eSpin.GetValue()
+			if end > start {
+				detectedSections[idx].StartSec = start
+				detectedSections[idx].EndSec = end
+				updated := detectedSections[idx]
+				secListStore.Set(iter, []int{0, 1, 2, 3}, []interface{}{
+					fmt.Sprintf("%.1f", updated.StartSec),
+					fmt.Sprintf("%.1f", updated.EndSec),
+					fmt.Sprintf("%.1f", updated.DurationSec()),
+					fmt.Sprintf("%.0f LU", updated.GapDB),
+				})
+			}
+		}
+		dlg.Destroy()
+	}
+	editSecBtn.Connect("clicked", func() { openEditDialog() })
+	secTV.Connect("row-activated", func() { openEditDialog() })
 
 	removeSecBtn, _ := gtk.ButtonNewWithLabel("Remove")
 	secBtnRow.Add(removeSecBtn)

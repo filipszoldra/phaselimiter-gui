@@ -38,9 +38,9 @@ func suggestSettings(a AudioAnalysis) SuggestedSettings {
 		s.Loudness = -14
 		s.Level = 0.25
 		s.PreCompressionMeanSec = 0.45
-		s.PreCompressionThreshold = 10
+		s.PreCompressionThreshold = 6
 		s.Notes = append(s.Notes, fmt.Sprintf(
-			"High loudness range (LRA %.1f LU): very dynamic / varied sections → gentle intensity, long pre-comp window, -14 LUFS target.", lra))
+			"High loudness range (LRA %.1f LU): big dynamic swings → more pre-compression to smooth peaks before the limiter (threshold 6), long window, -14 LUFS target.", lra))
 	case lra >= 6:
 		s.Loudness = -13
 		s.Level = 0.4
@@ -52,9 +52,9 @@ func suggestSettings(a AudioAnalysis) SuggestedSettings {
 		s.Loudness = -12
 		s.Level = 0.6
 		s.PreCompressionMeanSec = 0.2
-		s.PreCompressionThreshold = 6
+		s.PreCompressionThreshold = 10
 		s.Notes = append(s.Notes, fmt.Sprintf(
-			"Low loudness range (LRA %.1f LU): already fairly compressed → can push a little harder.", lra))
+			"Low loudness range (LRA %.1f LU): already compressed, peaks uniform → light pre-compression (threshold 10), can push intensity harder.", lra))
 	}
 
 	// Louder targets drive the limiter harder, so give it more iterations.
