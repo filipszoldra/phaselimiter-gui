@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>phaselimiter-gui — opis kontrolek (PL)</title>
+<style>
+  :root { --bg:#14161a; --card:#1e2228; --fg:#e8eaed; --muted:#9aa3ad; --accent:#5db0ff; --good:#57c98a; --warn:#f0b85a; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:0 0 4rem; background:var(--bg); color:var(--fg);
+         font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+  header { padding:2.5rem 1.5rem 1.5rem; max-width:880px; margin:0 auto; }
+  h1 { margin:0 0 .3rem; font-size:1.9rem; }
+  .lead { color:var(--muted); margin:.2rem 0 0; }
+  main { max-width:880px; margin:0 auto; padding:0 1.5rem; }
+  section { background:var(--card); border:1px solid #2a2f37; border-radius:12px;
+            padding:1.25rem 1.4rem; margin:1.1rem 0; }
+  h2 { margin:.2rem 0 .8rem; font-size:1.3rem; }
+  h2 .tag { font-size:.7rem; font-weight:600; color:var(--bg); background:var(--accent);
+            border-radius:999px; padding:.15rem .55rem; vertical-align:middle; margin-left:.5rem; }
+  h2 .tag.adv { background:var(--warn); }
+  h3 { margin:1.1rem 0 .3rem; font-size:1.05rem; color:var(--accent); }
+  code { background:#0e1014; color:#cfe7ff; padding:.1rem .4rem; border-radius:5px;
+         font-family:ui-monospace,Consolas,Menlo,monospace; font-size:.88em; }
+  .meta { color:var(--muted); font-size:.9rem; margin:.15rem 0 .5rem; }
+  .meta b { color:var(--fg); }
+  table { width:100%; border-collapse:collapse; margin:.6rem 0; font-size:.92rem; }
+  th, td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid #2a2f37; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .pill { display:inline-block; font-size:.78rem; border-radius:6px; padding:.1rem .45rem; }
+  .pill.crunch { background:#3a1f24; color:#ff9aa6; }
+  .pill.clicks { background:#3a2f1a; color:#ffd28a; }
+  .pill.pump  { background:#1f2f3a; color:#8ad0ff; }
+  .pill.smear { background:#2a233a; color:#c4a8ff; }
+  .note { border-left:3px solid var(--accent); padding:.5rem .8rem; margin:.8rem 0;
+          background:#0e1014; border-radius:0 8px 8px 0; color:var(--muted); }
+  .note b { color:var(--fg); }
+  .rec { color:var(--good); font-weight:600; }
+  footer { max-width:880px; margin:2rem auto 0; padding:0 1.5rem; color:var(--muted); font-size:.85rem; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>phaselimiter-gui — opis kontrolek</h1>
+  <p class="lead">Przewodnik po ustawieniach masteringu i ich wpływie na dźwięk.
+  Sekcja <b>Zaawansowane</b> służy do usuwania „glitchy”, które zostają nawet przy
+  spokojnym poziomie głośności i intensywności.</p>
+</header>
+
+<main>
+
+  <div class="note">
+    <b>Skrót dla niecierpliwych.</b> Jeśli słyszysz trzaski, chrupanie albo „pompowanie”
+    mimo ustawienia np. <code>-13 LUFS</code> i intensywności <code>0,4</code> — to nie wina
+    głośności. Winne są etapy <b>limitera</b>, <b>sufitu (ceiling)</b> i <b>pre‑kompresji</b>.
+    Ich kontrolki znajdziesz w sekcji <b>Zaawansowane</b> poniżej.
+  </div>
+
+  <!-- ============ PODSTAWOWE ============ -->
+  <section>
+    <h2>Ustawienia podstawowe <span class="tag">Podstawowe</span></h2>
+
+    <h3>Katalog wyjściowy <span class="meta">(Output directory)</span></h3>
+    <p class="meta">Folder, do którego zapisywane są zmasterowane pliki
+    (domyślnie <code>Pobrane</code> / <code>Pulpit</code>). Plik wynikowy otrzymuje
+    przyrostek <code>_output.wav</code>.</p>
+
+    <h3>Docelowa głośność <span class="meta">(Target loudness) → flaga <code>--reference</code></span></h3>
+    <p class="meta"><b>Zakres:</b> −20 … 0 LUFS &nbsp;·&nbsp; <b>Domyślnie:</b> −9 LUFS</p>
+    <p>Najważniejszy „duży” regulator. Określa, jak głośno ma być wyrównany utwór przed
+    limiterem. Niższa wartość (np. <code>−13</code> / <code>−14</code>) = mniej wzmocnienia
+    wpychanego w limiter = mniej chrupania i pompowania. <span class="rec">Zalecane −12 do −14</span>
+    dla muzyki z zachowaną dynamiką.</p>
+
+    <h3>Intensywność masteringu <span class="meta">(Mastering intensity) → flaga <code>--mastering5_mastering_level</code></span></h3>
+    <p class="meta"><b>Zakres:</b> 0,0 … 1,0 &nbsp;·&nbsp; <b>Domyślnie:</b> 1,0</p>
+    <p>Określa, jak mocno algorytm AutoMastering5 przekształca brzmienie w stronę
+    wyuczonego wzorca (korekcja pasmowa + kompresja M/S, dobierana optymalizacją
+    różnicowo‑ewolucyjną). Niżej = delikatniej, bliżej oryginału.</p>
+    <div class="note"><b>Uwaga techniczna.</b> W trybie <code>mastering5</code> (jedyny używany
+    przez tę aplikację) działa <b>tylko</b> ta jedna flaga. Pokrewne
+    <code>--mastering_matching_level</code> i <code>--mastering_ms_matching_level</code>
+    mają znaczenie wyłącznie w trybie <code>classic</code> — tutaj są nieaktywne, więc
+    aplikacja ich nie przekazuje.</div>
+
+    <h3>Zachowaj bas <span class="meta">(Preserve bass) → flaga <code>--erb_eval_func_weighting</code></span></h3>
+    <p>Włącza percepcyjne ważenie błędu limitera tak, aby chronić niskie częstotliwości
+    przed nadmiernym ograniczaniem.</p>
+
+    <div class="note"><b>Uwaga.</b> Jeżeli zjechałeś już z głośnością i intensywnością,
+    a artefakty zostają — zostaw te suwaki w spokoju i przejdź do sekcji
+    <b>Zaawansowane</b>. To tam są właściwe lekarstwa.</div>
+  </section>
+
+  <!-- ============ ZAAWANSOWANE ============ -->
+  <section>
+    <h2>Zaawansowane — redukcja glitchy <span class="tag adv">Zaawansowane</span></h2>
+    <p class="meta">Te etapy działają <b>niezależnie</b> od głośności i intensywności —
+    dlatego potrafią psuć dźwięk nawet przy spokojnych ustawieniach podstawowych.</p>
+
+    <h3>Tylko limiter (diagnostyka) <span class="meta">(Limiter only) → <code>--mastering false</code></span></h3>
+    <p class="meta"><b>Domyślnie:</b> wyłączone</p>
+    <p>Pomija etap AutoMastering5 (dopasowanie do wzorca) i uruchamia <b>sam limiter</b>.
+    Służy do diagnozy: jeśli po włączeniu tej opcji ciche fragmenty (intra, przejścia)
+    przestają być zniekształcone, to winowajcą jest właśnie globalne dopasowanie
+    AutoMastering5 — wtedy obniż <b>Intensywność masteringu</b> (np. do 0,2–0,3). To nie
+    jest tryb produkcyjny, tylko test A/B.</p>
+
+    <h3>Sufit true‑peak (dB) <span class="meta">(True‑peak ceiling) → <code>--ceiling</code></span></h3>
+    <p class="meta"><b>Zakres:</b> −3,0 … 0,0 dB &nbsp;·&nbsp; <b>Domyślnie:</b> −1,0 dB
+    &nbsp;·&nbsp; Cel: <span class="pill clicks">trzaski / przesterowania</span></p>
+    <p>Maksymalny poziom szczytu międzypróbkowego (true‑peak). Przy <code>0 dB</code> limiter
+    celuje dokładnie w 0 dBFS, a po konwersji/kodowaniu (zwłaszcza MP3/AAC) szczyty
+    międzypróbkowe „wyskakują” ponad zero i słychać <b>trzaski</b>. Ustawienie
+    <span class="rec">−1,0 dB</span> daje zapas i eliminuje większość kliknięć.</p>
+
+    <h3>Nadpróbkowanie limitera (×) <span class="meta">(Limiter oversampling) → <code>--limiter_internal_oversample</code></span></h3>
+    <p class="meta"><b>Opcje:</b> 1 / 2 / 4 &nbsp;·&nbsp; <b>Domyślnie:</b> 1
+    &nbsp;·&nbsp; Cel: <span class="pill crunch">chrupanie / aliasing</span></p>
+    <p>Twarde limitowanie przy 44,1 kHz tworzy składowe powyżej częstotliwości Nyquista,
+    które „zawijają się” z powrotem jako szorstkie, nieharmoniczne <b>chrupanie</b>.
+    Praca limitera w <code>2×</code> lub <code>4×</code> usuwa większość tego aliasingu.
+    <span class="rec">Zalecane 2×</span>. Koszt: większe zużycie CPU i RAM.</p>
+
+    <h3>Jakość limitera (iteracje) <span class="meta">(Limiter quality) → <code>--max_iter1</code></span></h3>
+    <p class="meta"><b>Zakres:</b> 100 … 400 (co 50) &nbsp;·&nbsp; <b>Domyślnie:</b> 100
+    &nbsp;·&nbsp; Cel: <span class="pill crunch">zniekształcenia</span>
+    <span class="pill smear">rozmycie</span></p>
+    <p>Limiter to iteracyjny optymalizator (FISTA), który stopniowo „dociska” sygnał do
+    sufitu. Zbyt mała liczba iteracji = optymalizacja nie zdąży się zbiec = zostaje słyszalny
+    błąd (chrupanie) i pre‑ringing (rozmycie transjentów). Wyższa wartość = czystszy wynik,
+    ale dłuższe przetwarzanie. <span class="rec">Spróbuj 200</span> jeśli słyszysz zniekształcenia.</p>
+
+    <h3>Pre‑kompresja <span class="meta">(Pre‑compression) → <code>--pre_compression</code></span></h3>
+    <p class="meta"><b>Domyślnie:</b> włączona &nbsp;·&nbsp;
+    Cel: <span class="pill pump">pompowanie / oddychanie</span></p>
+    <p>Kompresor w dziedzinie głośności, działający <b>przed</b> limiterem. Wyrównuje
+    najgłośniejsze fragmenty. Bywa źródłem <b>pompowania</b>. Odznacz, aby zachować pełną
+    dynamikę i usunąć efekt oddychania.</p>
+
+    <h3>Próg pre‑kompresji (dB) <span class="meta">→ <code>--pre_compression_threshold</code></span></h3>
+    <p class="meta"><b>Zakres:</b> 0 … 18 dB &nbsp;·&nbsp; <b>Domyślnie:</b> 6 dB</p>
+    <p>O ile dB ponad zmierzoną głośność zaczyna działać pre‑kompresor. Wyższa wartość =
+    kompresor reaguje rzadziej = <b>więcej dynamiki</b> i mniej pompowania.</p>
+
+    <h3>Okno pre‑kompresji (s) <span class="meta">→ <code>--pre_compression_mean_sec</code></span></h3>
+    <p class="meta"><b>Zakres:</b> 0,05 … 1,0 s &nbsp;·&nbsp; <b>Domyślnie:</b> 0,2 s</p>
+    <p>Długość okna uśredniania. Krótkie okno (0,2 s) potrafi „oddychać” na basie i
+    transjentach. <span class=”rec”>Wydłużenie do ~0,4 s</span> wygładza działanie i
+    redukuje pompowanie.</p>
+
+    <h3>Siła dopasowania stereo <span class=”meta”>→ <code>--mastering_ms_matching_level</code></span></h3>
+    <p class=”meta”><b>Zakres:</b> 0 … 1 &nbsp;·&nbsp; <b>Domyślnie:</b> 1,0</p>
+    <p>Określa, jak mocno AutoMastering5 przekształca pole stereo (balans M/S) w kierunku wzorca.
+    Przy <code>1,0</code> w pełni dopasowuje szerokość stereo per pasmo. Obniżenie do <span class=”rec”>0,5–0,7</span>
+    zachowuje więcej oryginalnego obrazu stereo i redukuje nadmierne poszerzanie hihatsów
+    lub przestrzenne rozmycie na materiale ze rzadkimi górami.</p>
+
+    <h3>Limit wzmocnienia per pasmo <span class=”meta”>→ <code>--mastering5_eq_band_levels</code></span></h3>
+    <p class=”meta”><b>Zakres:</b> 0,0 … 2,0 per pasmo &nbsp;·&nbsp; <b>Domyślnie:</b> 1,0 (neutralnie)</p>
+    <p>Dziewięć pokręteł skalujących <b>górną granicę wet-gain</b> optymalizatora AutoMastering5
+    (mid + side) dla każdego pasma. Wartość &lt; 1 ogranicza, ile AI może wzmocnić lub poszerzyć
+    dane pasmo; &gt; 1 pozwala na więcej. Ograniczenie jest miękkie (kara w funkcji kosztu).</p>
+    <table>
+      <thead><tr><th>Pasmo</th><th>Zakres</th><th>Kiedy obniżyć</th></tr></thead>
+      <tbody>
+        <tr><td>Sub</td><td>0–148 Hz</td><td>gdy bas ulega deformacji</td></tr>
+        <tr><td>Low</td><td>148–392 Hz</td><td>gdy kopnięcie jest pompowane</td></tr>
+        <tr><td>Low-mid</td><td>392–795 Hz</td><td></td></tr>
+        <tr><td>Mid</td><td>795–1458 Hz</td><td></td></tr>
+        <tr><td>Upper-mid</td><td>1458–2550 Hz</td><td></td></tr>
+        <tr><td>Presence</td><td>2550–4349 Hz</td><td>gdy wokale stają się szorstkie</td></tr>
+        <tr><td>High</td><td>4349–7314 Hz</td><td>gdy talerze są przejaskrawione</td></tr>
+        <tr><td>Very-high</td><td>7314–12k Hz</td><td>gdy hihatsy rozmywają się / poszerzają</td></tr>
+        <tr><td>Air</td><td>12k+ Hz</td><td>przy nagraniach ze rzadkimi górami</td></tr>
+      </tbody>
+    </table>
+    <p>Flaga jest wysyłana tylko gdy co najmniej jedno pasmo różni się od 1,0.</p>
+  </section>
+
+  <!-- ============ ANALIZA I SUGESTIE ============ -->
+  <section>
+    <h2>Analiza i sugestie <span class="tag">Nowe</span></h2>
+
+    <h3>Analizuj utwór i zasugeruj ustawienia <span class="meta">(Analyze a track &amp; suggest settings)</span></h3>
+    <p>Przycisk otwiera okno wyboru pliku. Po wybraniu dowolnego pliku audio (WAV, MP3, FLAC…)
+    program mierzy go narzędziem <code>audio_analyzer</code> (wbudowanym w silnik) i na podstawie
+    wyników wypełnia <b>wszystkie kontrolki</b> łagodnymi, glitch‑unikającymi wartościami:</p>
+    <table>
+      <thead><tr><th>Co mierzę</th><th>Co ustawiam</th></tr></thead>
+      <tbody>
+        <tr><td>Zakres głośności (LRA)</td><td>Intensywność, okno pre‑komp., docelowy LUFS</td></tr>
+        <tr><td>True‑peak</td><td>Sufit (zawsze ≤ −1,0 dB)</td></tr>
+        <tr><td>Balans pasm (ERB)</td><td>Zachowaj bas (jeśli bas dominuje)</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>Format wejścia.</b> Pliki inne niż WAV są automatycznie dekodowane
+    przez <code>ffmpeg</code> do tymczasowego WAV przed analizą — nie musisz nic konwertować.</div>
+    <div class="note"><b>Wynik → sekcje ciche.</b> Jeśli utwór ma fragmenty znacznie cichsze
+    od reszty (intro, break), pojawiają się one w liście <b>Wykryte sekcje ciche</b> poniżej
+    przycisku, gotowe do rescue‑masteringu.</div>
+
+    <h3>Raport przed/po <span class="meta">(Before/after report — dwuklik gotowego wiersza)</span></h3>
+    <p>Po zakończeniu masteringu kliknij dwukrotnie gotowy wiersz w kolejce. Otworzy się okno z:</p>
+    <ul style="margin:.4rem 0 0 1.2rem">
+      <li><b>Tabelą pomiarów</b> — Loudness (LUFS), LRA, True‑peak, Dynamika, Stereo, Sound Quality 2,
+          input vs. output z ostrzeżeniami (np. ⚠ dynamics squashed, ⚠ true‑peak > 0 dBFS).</li>
+      <li><b>Obrazami spektrogramu, rozkładu widma i obrazu stereo</b> — input po lewej, output po prawej.</li>
+      <li><b>Listą wykrytych sekcji cichych</b> z opisem, które fragmenty mogą być nadmiernie przetworzone.</li>
+    </ul>
+  </section>
+
+  <!-- ============ SEKCJE CICHE ============ -->
+  <section>
+    <h2>Wykryte sekcje ciche <span class="tag adv">Zaawansowane</span></h2>
+    <p class="meta">Dostępne po kliknięciu <b>Analizuj utwór i zasugeruj ustawienia</b>.</p>
+    <p>Algorytm szuka fragmentów, gdzie krótkoterminowa głośność jest co najmniej
+    <b>9 LU poniżej</b> typowego poziomu głośnego fragmentu (95. percentyl krzywej).
+    Takie miejsca globalny mastering zwykle nadmiernie przetwarza — AutoMastering5
+    dopasowuje się do statystyk całości i podbija niemal puste pasma w cichych momentach.</p>
+
+    <h3>Edycja listy sekcji</h3>
+    <p>Lista jest uzupełniana automatycznie po analizie. Możesz:</p>
+    <ul style="margin:.4rem 0 0 1.2rem">
+      <li><b>+ Add</b> — ręcznie dodaj sekcję wpisując start i koniec w sekundach.</li>
+      <li><b>Remove</b> — usuń zaznaczony wiersz.</li>
+    </ul>
+
+    <h3>Intensywność sekcji <span class="meta">→ <code>--mastering5_mastering_level</code> (dla sekcji)</span></h3>
+    <p class="meta"><b>Zakres:</b> 0,0 … 1,0 &nbsp;·&nbsp; <b>Domyślnie:</b> 0,25</p>
+    <p>Delikatniejszy poziom masteringu używany tylko do re‑renderowania cichych fragmentów
+    (global master zachowuje swój poziom intensywności).</p>
+
+    <h3>Section-aware mastering <span class="meta">(checkbox)</span></h3>
+    <p>Gdy zaznaczony i lista sekcji nie jest pusta:</p>
+    <ol style="margin:.4rem 0 0 1.2rem">
+      <li>Silnik masteruje cały utwór normalnie (zachowuje łuk głośności).</li>
+      <li>Każdą cichą sekcję masteruje ponownie z <b>delikatniejszą intensywnością</b>
+          (osobno, z wyciętego fragmentu wejściowego).</li>
+      <li>Uratowana sekcja jest wyrównana głośnościowo do global mastera w tym miejscu.</li>
+      <li>Wkleja ją z powrotem z 80 ms cross‑fade na granicach.</li>
+    </ol>
+    <div class="note"><b>Jeśli rescue nie powiodło się</b> (brak ffmpeg, błąd silnika), plik
+    wynikowy pozostaje global masterem — nigdy nie tracisz bazy.</div>
+  </section>
+
+  <!-- ============ TON REFERENCYJNY EQ ============ -->
+  <section>
+    <h2>Ton referencyjny (EQ) <span class="tag adv">Zaawansowane</span></h2>
+    <p class="meta">Kontrolka <b>Reference tone (EQ)</b> w zwiniętej sekcji — rozwiń, żeby zobaczyć suwaki.</p>
+    <p>AutoMastering5 dopasowuje brzmienie do wyuczonego <b>wzorca referencyjnego</b>.
+    Wzorzec to tablica wartości <code>mid_mean</code> (docelowy poziom każdego pasma ERB w dB) —
+    innymi słowy: <b>docelowa krzywa tonalna AI</b>. Te cztery suwaki pozwalają ją <em>przechylić</em>
+    bez przebudowania silnika:</p>
+    <table>
+      <thead><tr><th>Suwak</th><th>Zakres częst.</th><th>Efekt +dB</th></tr></thead>
+      <tbody>
+        <tr><td>Low</td><td>&lt;250 Hz</td><td>AI celuje w bassowszy dźwięk</td></tr>
+        <tr><td>Low-mid</td><td>250–2000 Hz</td><td>cieplejszy środek</td></tr>
+        <tr><td>High-mid</td><td>2000–6000 Hz</td><td>bardziej obecność/jasność</td></tr>
+        <tr><td>High</td><td>&gt;6000 Hz</td><td>więcej powietrza</td></tr>
+      </tbody>
+    </table>
+    <p class="meta"><b>Zakres:</b> ±6 dB (ograniczone w kodzie) &nbsp;·&nbsp; <b>Domyślnie:</b> 0 (brak zmiany)</p>
+    <p>GUI modyfikuje pasmo <code>mid_mean</code> w pliku <code>mastering_reference.json</code>,
+    zapisuje kopię tymczasową i przekazuje ją silnikowi przez
+    <code>--mastering5_mastering_reference_file</code>. Pola <code>covariance</code>,
+    <code>side_mean</code> i inne pozostają niezmienione.</p>
+    <div class="note"><b>⚠ Zbyt duże wzmocnienie pustego pasma</b> (np. +6 dB High przy nagraniu
+    bez wysokich harmonicznych) walczy z limiterem i może <em>pogorszyć</em> artefakty.
+    Zmiana ±2 dB zazwyczaj jest wystarczająco słyszalna. Przy 0 dB na wszystkich suwakach
+    zachowanie jest identyczne jak przed tą funkcją.</div>
+  </section>
+
+  <!-- ============ TABELA OBJAW -> LEK ============ -->
+  <section>
+    <h2>Objaw → lekarstwo <span class="tag adv">Ściąga</span></h2>
+    <table>
+      <thead><tr><th>Co słyszysz</th><th>Najpierw zmień</th><th>Potem</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="pill clicks">Trzaski / kliknięcia</span></td>
+          <td>Sufit true‑peak → <b>−1,0 dB</b></td>
+          <td>Sprawdź format wyjścia (WAV jest najbezpieczniejszy)</td>
+        </tr>
+        <tr>
+          <td><span class="pill crunch">Chrupanie na szczytach</span></td>
+          <td>Nadpróbkowanie limitera → <b>2×</b></td>
+          <td>Jakość limitera → <b>200</b>; niższa głośność</td>
+        </tr>
+        <tr>
+          <td><span class="pill pump">Pompowanie / oddychanie</span></td>
+          <td>Okno pre‑komp. → <b>0,4 s</b></td>
+          <td>Próg pre‑komp. wyżej lub wyłącz pre‑kompresję</td>
+        </tr>
+        <tr>
+          <td><span class="pill smear">Rozmycie / utrata klarowności</span></td>
+          <td>Jakość limitera → <b>200</b></td>
+          <td>Niższa intensywność masteringu</td>
+        </tr>
+        <tr>
+          <td>Zła barwa — za jasno lub za ciemno</td>
+          <td>Ton referencyjny (EQ) → przechyl suwaki</td>
+          <td>Zacznij od ±2 dB; użyj raportu przed/po do weryfikacji</td>
+        </tr>
+        <tr>
+          <td>Distortion / szum na cichym intro lub break</td>
+          <td>Analiza → <b>Sekcje ciche</b> + niższa intensywność sekcji (0,15–0,25)</td>
+          <td>Włącz <b>Section-aware mastering</b>; jeśli wciąż widoczne — skróć próg pre‑komp.</td>
+        </tr>
+        <tr>
+          <td>Deformacja kopnięcia / hihatsy się poszerzają</td>
+          <td>Limit per pasmo: obniż Sub/Low (kopnięcie) lub High/Very-high/Air (hihats)</td>
+          <td>Połącz z niższą siłą dopasowania stereo</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">Zmieniaj <b>jeden</b> parametr naraz i porównuj odsłuchowo —
+    inaczej trudno usłyszeć, co faktycznie pomogło.</div>
+  </section>
+
+</main>
+
+<footer>
+  phaselimiter-gui · dokumentacja kontrolek (PL). Silnik DSP: projekt
+  <code>phaselimiter</code> (<a href="https://github.com/ai-mastering/phaselimiter">ai-mastering/phaselimiter</a>).
+  Nazwy flag odpowiadają argumentom przekazywanym do <code>phase_limiter</code> w pliku
+  <code>mastering.go</code>.
+</footer>
+
+</body>
+</html>

@@ -1,86 +1,85 @@
-phaselimiter-gui is a GUI frontend for phaselimiter (a mastering program used in bakuage.com and aimastering.com).
+# phaselimiter-gui (filipszoldra fork)
 
-## features
+A GUI frontend for **phaselimiter** — the same AI mastering algorithm used on
+[bakuage.com](https://bakuage.com) / [aimastering.com](https://aimastering.com).
+Processes locally, no internet required.
 
-- The same algorithm with bakuage.com and aimastering.com
-- No internet access (run on local PC)
-- No settings and poor UI (under implementation)
-- No support
+## About this fork
 
-## install
+This fork by **Filip Szołdra** builds on the original upstream project
+([ai-mastering/phaselimiter-gui](https://github.com/ai-mastering/phaselimiter-gui))
+and adds a set of practical controls and analysis tools aimed at reducing glitches
+("crunch", pumping, true-peak clicks, smearing) and giving the user more control
+over the mastering output — **without recompiling the C++ DSP engine**.
 
-### windows
+### What's changed vs. upstream
 
-1. Install [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) (not required if already installed)
-2. Download the files attached to [the latest release](https://github.com/ai-mastering/phaselimiter-gui/releases) and extract it
-3. Download [ffmpeg.exe](https://ffmpeg.org/) and put it in the same directory as phaselimiter-gui.exe (or install to some location in $PATH)
-4. Run phaselimiter-gui.exe
+| Feature | Description |
+|---|---|
+| **Advanced glitch-reduction controls** | Limiter oversampling (1×/2×/4×), limiter quality (iterations), true-peak ceiling, pre-compression on/off + threshold + smoothing window |
+| **Stereo match strength** | `--mastering_ms_matching_level` (0 = ignore stereo-field, 1 = full match); lower reduces over-widening on sparse material |
+| **Per-band boost limit (9-band EQ)** | 9 spinbuttons (0.0–2.0, default 1.0) mapping to the engine's `--mastering5_eq_band_levels` flag — scales the AutoMastering5 optimizer's per-band wet-gain upper bound; lower = less AI reshaping in that band; useful for taming kick deformation or hihat over-widening |
+| **Diagnostic "Limiter only" mode** | Bypasses AutoMastering5 for A/B testing whether quiet-section distortion is caused by the reference-matching stage |
+| **"Analyze & suggest settings"** | Runs the bundled `audio_analyzer` on any audio file and auto-fills every control with gentle, glitch-avoiding settings derived from LRA, true-peak and spectral balance |
+| **Detected quiet sections** | Automatically finds fragments that sit >9 LU below the loud sections; displayed in an editable table; used by section-aware mastering |
+| **Section-aware mastering** | Re-renders each quiet section with a gentler mastering level, loudness-matches it to the global master, and splices it back with cross-fades — no arc flattening |
+| **Reference-tone EQ** | Tilts the AI's tonal target (mid_mean per ERB band group) via ±6 dB sliders: Low / Low-mid / High-mid / High; passed as a temp `--mastering5_mastering_reference_file` |
+| **Before/after report** | Double-click a finished mastering job to see a scorecard (LUFS, LRA, true-peak, dynamics, stereo, sound quality) plus input-vs-output spectrogram, spectrum and stereo images |
+| **Bigger default window** | 720×600 instead of 400×400 |
+| **Polish UI guide** | `docs/sterowanie-pl.html` — detailed Polish description of every control and its effect |
 
-### linux/mac
+All new features are Go-level changes to the GUI; no C++ code was modified.
 
-Please build it from the source code yourself.
+## Install (Windows)
 
-Alternatively, although I haven't tested it, running the Windows binary using Wine might be an easier option.
-This is especially the case because building the main automatic mastering program, phaselimiter, can be challenging due to the many dependencies required.
+1. Install [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) if not already present.
+2. Download the build artifact from [GitHub Actions](../../actions) (branch `advanced-glitch-controls`) and extract it.
+3. Place [ffmpeg.exe](https://ffmpeg.org/) in the same directory as `phaselimiter-gui.exe` (or add it to `%PATH%`).
+4. Run `phaselimiter-gui.exe`.
 
-## how to use
+The `phaselimiter/` engine directory (with `bin/phase_limiter.exe`, `bin/audio_analyzer.exe` and `resource/`) must sit beside the exe — it is NOT included in the repository source but ships with the engine release.
 
-Drop audio files to the app window
+## How to use
 
-<img width="379" alt="スクリーンショット 2023-08-21 21 18 45" src="https://github.com/ai-mastering/phaselimiter-gui/assets/19356869/13e0c3d5-01a5-4acf-aad6-ba92cfb15c69">
+Drop audio files onto the app window to start mastering.
 
-## how to debug
+**Workflow for best results:**
+1. Click **"Analyze a track & suggest settings"** → pick your track → controls auto-fill with gentle values tuned to its dynamics.
+2. Expand **"Detected quiet sections"** to review auto-detected problem spans (quiet intros, breaks).
+3. (Optional) Enable **"Section-aware mastering"** to rescue those sections with a gentler level.
+4. (Optional) Expand **"Reference tone (EQ)"** to tilt the AI's tonal target.
+5. Drop the file to master it. Double-click the finished row for a before/after report.
 
-Use phaselimiter-gui-console.exe that is the same with phaselimiter-gui.exe except it logs to the console
+## Debug / console build
 
-## runtime dependencies
+Use `phaselimiter-gui-console.exe` — identical to the windowed build but logs all engine output and progress to the console window.
 
-### windows
+## Runtime dependencies (Windows)
 
 - Microsoft Visual C++ Redistributable
-- ffmpeg.exe
+- `ffmpeg.exe` (on `%PATH%` or beside the exe)
+- `phaselimiter/` engine directory beside the exe
 
-### linux/mac
+## Build
 
-Please build it from source code by yourself.
+No local Go/GTK toolchain is required for contributors — all builds run in GitHub Actions (`.github/workflows/build-win.yml`) using a Fedora cross-compile container with `mingw64-gtk3`.
 
-## license
+To build locally with Docker:
+```sh
+docker run --rm -v "$PWD:/src" -w /src fedora:39 bash -c "
+  yum install -y mingw64-gtk3 go glib2-devel mingw64-gcc.x86_64 &&
+  sed -i -e 's/-Wl,-luuid/-luuid/g' /usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig/gdk-3.0.pc &&
+  PKG_CONFIG_PATH=/usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig \
+    CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc GOOS=windows GOARCH=amd64 \
+    go build -o phaselimiter-gui-console.exe
+"
+```
+
+## License
 
 - MIT
-- thirdparty: https://github.com/ai-mastering/phaselimiter-gui/tree/master/licenses
+- Third-party: [licenses/](licenses/)
 
-## In Japanese
+---
 
-phaselimiter-gui は phaselimiter (bakuage.com / aimastering.com で使われているマスタリングプログラム) のGUIフロントエンドです
-
-## 特徴
-
-- bakuage.com / aimastering.com と同じマスタリングアルゴリズム
-- インターネット不要 (ローカルPCで計算)
-- 設定無し/poor UI (開発中)
-- サポート無し
-
-## インストール
-
-### windows
-
-1. [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) をインストール (インストール済みの場合は不要)
-2. https://github.com/ai-mastering/phaselimiter-gui/releases から最新ファイルをダウンロードし解凍
-3. [ffmpeg.exe](https://ffmpeg.org/) をダウンロードし phaselimiter-gui.exe と同じディレクトリに格納 (またはパスの通った場所へインストール)
-5. phaselimiter-gui.exe を実行
-
-### linux/mac
-
-ソースコードからビルド。
-
-phaselimiterのビルドに必要な依存関係が多いので、動作確認していませんが、Windows用のバイナリをwineで動かすほうが簡単かもしれません。
-
-## 使い方
-
-アプリの画面にオーディオファイルをドロップ
-
-<img width="379" alt="スクリーンショット 2023-08-21 21 18 45" src="https://github.com/ai-mastering/phaselimiter-gui/assets/19356869/13e0c3d5-01a5-4acf-aad6-ba92cfb15c69">
-
-## デバッグ方法
-
-phaselimiter-gui-console.exe を使うとログを確認可能
+*Original project: [ai-mastering/phaselimiter-gui](https://github.com/ai-mastering/phaselimiter-gui) by ai-mastering.*
