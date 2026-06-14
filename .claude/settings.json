@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:anaconda.org)",
+      "WebFetch(domain:conda.anaconda.org)",
+      "WebFetch(domain:www.intel.com)",
+      "WebFetch(domain:community.intel.com)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:oneapi-src.github.io)",
+      "WebFetch(domain:melatonin.dev)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(ls \"c:/Users/filip/Desktop/Muzyka 2026/Repo/phaselimiter-gui/\" 2>/dev/null && echo \"---\" && ls \"c:/Users/filip/Desktop/Muzyka 2026/\" 2>/dev/null)",
+      "Read(//c/Users/filip/Desktop/Muzyka 2026/**)",
+      "Bash(cp \"c:/Users/filip/Desktop/Muzyka 2026/Repo/phaselimiter-engine-artifact/bin/phase_limiter.exe\" \"c:/Users/filip/Desktop/Muzyka 2026/Repo/build-results5/phaselimiter/bin/phase_limiter.exe\")",
+      "Bash(cp \"c:/Users/filip/Desktop/Muzyka 2026/Repo/phaselimiter-engine-artifact/bin/tbb12.dll\" \"c:/Users/filip/Desktop/Muzyka 2026/Repo/build-results5/phaselimiter/bin/tbb12.dll\")",
+      "Bash(cp \"c:/Users/filip/Desktop/Muzyka 2026/Repo/phaselimiter-engine-artifact/bin/tbbmalloc.dll\" \"c:/Users/filip/Desktop/Muzyka 2026/Repo/build-results5/phaselimiter/bin/tbbmalloc.dll\")",
+      "Bash(cp \"c:/Users/filip/Desktop/Muzyka 2026/Repo/phaselimiter-engine-artifact/bin/tbbmalloc_proxy.dll\" \"c:/Users/filip/Desktop/Muzyka 2026/Repo/build-results5/phaselimiter/bin/tbbmalloc_proxy.dll\")",
+      "Bash(cp \"c:/Users/filip/Desktop/Muzyka 2026/Repo/phaselimiter-engine-artifact/bin/tbbbind_2_5.dll\" \"c:/Users/filip/Desktop/Muzyka 2026/Repo/build-results5/phaselimiter/bin/tbbbind_2_5.dll\")",
+      "Bash(where ffmpeg *)",
+      "Bash(find \"C:/Users/filip/Desktop/Muzyka 2026/Repo\" -name \"ffmpeg.exe\" 2>/dev/null | head -5 && find \"C:/Users/filip/Desktop\" -name \"ffmpeg.exe\" -maxdepth 4 2>/dev/null | head -3)",
+      "Read(//c/Users/filip/Desktop/**)",
+      "Bash(../bin/phase_limiter.exe --mastering true --mastering_mode mastering5 --reference -9 --ffmpeg 'C:/Users/filip/Desktop/Muzyka 2026/Repo/build-results5/ffmpeg.exe' --input 'C:/Users/filip/Desktop/Muzyka 2026/Repo/test2/filip3.wav' --output 'C:/Users/filip/Desktop/Muzyka 2026/Repo/test2/filip3_new_engine.wav' --sound_quality2_cache ./sound_quality2_cache --start_at 0 --end_at 10)",
+      "Read(//c/Users/filip/Desktop/Muzyka 2026/Repo/phaselimiter/**)",
+      "Bash(cmd /c \"for %f in \\(\\\\\"C:\\\\Users\\\\filip\\\\Desktop\\\\Muzyka 2026\\\\Repo\\\\build-results6\\\\\"\\) do echo %~sf\")",
+      "PowerShell(python --version 2>&1)",
+      "PowerShell(pip install numpy scipy matplotlib --quiet 2>&1)",
+      "PowerShell(python -c \"import numpy, scipy, matplotlib; print\\('OK'\\)\" 2>&1)",
+      "PowerShell(python \"C:\\\\Users\\\\filip\\\\Desktop\\\\Muzyka 2026\\\\Repo\\\\test\\\\analyze_bands.py\" 2>&1)"
+    ]
+  }
+}

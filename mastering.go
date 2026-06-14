@@ -42,9 +42,6 @@ type Mastering struct {
 	PreCompressionMeanSec   float64
 	MSMatchingLevel         float64    // mastering_ms_matching_level: stereo-field match strength (0=ignore, 1=full)
 	EQBandLevels            [9]float64 // mastering5_eq_band_levels: per-band optimizer upper-bound multipliers (1=neutral)
-	// Reference-EQ: tilt the AI's target tonal curve.
-	ReferenceBasePath string
-	ReferenceEQ       ReferenceEQ
 	// Section-aware mastering: re-render quiet sections with gentler settings.
 	Sections               []Section
 	SectionIntensity       float64
@@ -62,8 +59,8 @@ type MasteringRunner struct {
 }
 
 // buildEngineArgs constructs the phase_limiter argument list for the given input/output
-// paths and mastering level. Returns the args and a cleanup func that removes any temp
-// files created (e.g. the reference-EQ JSON).
+// paths and mastering level. Returns the args and a cleanup func for any temp files
+// created (currently none; kept for callers' defer).
 func (m Mastering) buildEngineArgs(inputPath, outputPath string, level float64) ([]string, func()) {
 	formatFloat := func(x float64) string {
 		return strconv.FormatFloat(x, 'f', 7, 64)
@@ -115,12 +112,6 @@ func (m Mastering) buildEngineArgs(inputPath, outputPath string, level float64) 
 				parts[i] = strconv.FormatFloat(v, 'f', 3, 64)
 			}
 			args = append(args, "--mastering5_eq_band_levels", strings.Join(parts, ","))
-		}
-		if !m.ReferenceEQ.IsZero() && m.ReferenceBasePath != "" {
-			if tmp, err := writeReferenceWithEQ(m.ReferenceBasePath, m.ReferenceEQ); err == nil {
-				cleanup = func() { os.Remove(tmp) }
-				args = append(args, "--mastering5_mastering_reference_file", tmp)
-			}
 		}
 	}
 
