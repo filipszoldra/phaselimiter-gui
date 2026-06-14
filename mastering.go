@@ -40,6 +40,8 @@ type Mastering struct {
 	PreCompression          bool
 	PreCompressionThreshold float64
 	PreCompressionMeanSec   float64
+	MSMatchingLevel         float64    // mastering_ms_matching_level: stereo-field match strength (0=ignore, 1=full)
+	EQBandLevels            [9]float64 // mastering5_eq_band_levels: per-band optimizer upper-bound multipliers (1=neutral)
 	// Reference-EQ: tilt the AI's target tonal curve.
 	ReferenceBasePath string
 	ReferenceEQ       ReferenceEQ
@@ -97,6 +99,23 @@ func (m Mastering) buildEngineArgs(inputPath, outputPath string, level float64) 
 			"--mastering_mode", "mastering5",
 			"--mastering5_mastering_level", formatFloat(level),
 		)
+		if m.MSMatchingLevel > 0 {
+			args = append(args, "--mastering_ms_matching_level", formatFloat(m.MSMatchingLevel))
+		}
+		anyNonDefault := false
+		for _, v := range m.EQBandLevels {
+			if math.Abs(v-1.0) > 1e-9 {
+				anyNonDefault = true
+				break
+			}
+		}
+		if anyNonDefault {
+			parts := make([]string, 9)
+			for i, v := range m.EQBandLevels {
+				parts[i] = strconv.FormatFloat(v, 'f', 3, 64)
+			}
+			args = append(args, "--mastering5_eq_band_levels", strings.Join(parts, ","))
+		}
 		if !m.ReferenceEQ.IsZero() && m.ReferenceBasePath != "" {
 			if tmp, err := writeReferenceWithEQ(m.ReferenceBasePath, m.ReferenceEQ); err == nil {
 				cleanup = func() { os.Remove(tmp) }

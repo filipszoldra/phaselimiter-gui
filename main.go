@@ -189,6 +189,29 @@ func main() {
 	preCompWindow.SetValue(0.2)
 	advBox.Add(preCompWindow)
 
+	msMatchingLabel, err := gtk.LabelNew("Stereo match strength (0 … 1, default 1) — lower = less stereo-field reshaping")
+	advBox.Add(msMatchingLabel)
+	msMatching, err := gtk.SpinButtonNewWithRange(0, 1, 0.05)
+	msMatching.SetValue(1.0)
+	advBox.Add(msMatching)
+
+	eqBandLabel, err := gtk.LabelNew("Per-band boost limit (0.0–2.0, default 1.0) — lower = less AI reshaping in that band")
+	advBox.Add(eqBandLabel)
+	eqBandNames := [9]string{
+		"Sub (0–148 Hz)", "Low (148–392 Hz)", "Low-mid (392–795 Hz)",
+		"Mid (795–1458 Hz)", "Upper-mid (1458–2550 Hz)", "Presence (2550–4349 Hz)",
+		"High (4349–7314 Hz)", "Very-high (7314–12k Hz)", "Air (12k+ Hz)",
+	}
+	var eqBandSpins [9]*gtk.SpinButton
+	for i, name := range eqBandNames {
+		lbl, _ := gtk.LabelNew(name)
+		advBox.Add(lbl)
+		spin, _ := gtk.SpinButtonNewWithRange(0.0, 2.0, 0.05)
+		spin.SetValue(1.0)
+		advBox.Add(spin)
+		eqBandSpins[i] = spin
+	}
+
 	// Reference-tone EQ: tilt the AI's target tonal curve (mid_mean) per band group.
 	eqExpander, err := gtk.ExpanderNew("Reference tone (EQ) — tilt the AI target (±6 dB)")
 	box.Add(eqExpander)
@@ -575,6 +598,10 @@ Notes
 			m.PreCompression = preComp.GetActive()
 			m.PreCompressionThreshold = preCompThreshold.GetValue()
 			m.PreCompressionMeanSec = preCompWindow.GetValue()
+			m.MSMatchingLevel = msMatching.GetValue()
+			for i, spin := range eqBandSpins {
+				m.EQBandLevels[i] = spin.GetValue()
+			}
 
 			m.ReferenceBasePath = filepath.Join(getExecDir(), "phaselimiter/resource/mastering_reference.json")
 			m.ReferenceEQ = ReferenceEQ{
