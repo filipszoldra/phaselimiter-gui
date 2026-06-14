@@ -224,8 +224,9 @@ function setupDnd() {
 // EQ Curve (Phase C) -- SVG, 9 draggable dots, catmull-rom smoothed
 // ---------------------------------------------------------------------------
 const EQ_BANDS = ["Sub", "Low", "Lo-mid", "Mid", "Up-mid", "Pres", "High", "V-hi", "Air"];
-const EQ_W = 540, EQ_H = 148;
-const EQ_PL = 8, EQ_PR = 28, EQ_PT = 20, EQ_PB = 30;
+const EQ_HZ   = ["<148", "148", "392", "795", "1.5k", "2.5k", "4.3k", "7.3k", "12k+"];
+const EQ_W = 540, EQ_H = 164;
+const EQ_PL = 8, EQ_PR = 28, EQ_PT = 20, EQ_PB = 46;
 const EQ_CW = EQ_W - EQ_PL - EQ_PR;
 const EQ_CH = EQ_H - EQ_PT - EQ_PB;
 
@@ -301,13 +302,19 @@ function initEQ() {
     valTxt.textContent = v.toFixed(2);
 
     const bandTxt = document.createElementNS(ns, "text");
-    bandTxt.setAttribute("x", cx); bandTxt.setAttribute("y", EQ_H - 2);
-    bandTxt.setAttribute("class", "eq-band-label");
+    bandTxt.setAttribute("x", cx); bandTxt.setAttribute("y", EQ_H - 22);
+    bandTxt.setAttribute("class", "eq-band-label eq-band-name");
     bandTxt.textContent = EQ_BANDS[i];
+
+    const hzTxt = document.createElementNS(ns, "text");
+    hzTxt.setAttribute("x", cx); hzTxt.setAttribute("y", EQ_H - 8);
+    hzTxt.setAttribute("class", "eq-band-label eq-hz");
+    hzTxt.textContent = EQ_HZ[i];
 
     svg.appendChild(dot);
     svg.appendChild(valTxt);
     svg.appendChild(bandTxt);
+    svg.appendChild(hzTxt);
     svg.appendChild(hit);   // last = on top, catches all pointer events
     _eqDotEls.push({ hit, dot });
     _eqValEls.push(valTxt);

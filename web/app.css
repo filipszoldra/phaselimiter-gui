@@ -171,6 +171,7 @@ details.diag summary { cursor: pointer; color: var(--muted); font-size: 12px; }
   font-weight: 600; font-family: var(--font); pointer-events: none; }
 .eq-band-label { font-size: 9.5px; text-anchor: middle; dominant-baseline: auto; fill: var(--muted);
   font-family: var(--font); pointer-events: none; }
+.eq-hz { font-size: 8.5px; fill: #4a5260; }
 .eq-scale { font-size: 9px; text-anchor: start; dominant-baseline: middle; fill: #4a5260;
   font-family: var(--font); pointer-events: none; }
 
