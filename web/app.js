@@ -38,22 +38,11 @@ function bindReadout(id, outId, fmt) {
   update();
 }
 
-function updatePrecompThreshold() {
-  const loudness = parseFloat(el("loudness").value);
-  const offset   = parseFloat(el("precompThreshold").value);
-  const actual   = loudness + offset;
-  const sign     = actual < 0 ? "−" : "";
-  el("precompThresholdOut").textContent = `${sign}${Math.abs(actual).toFixed(0)} dB`;
-}
-
 function setupReadouts() {
   bindReadout("loudness", "loudnessOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)} LUFS`);
   bindReadout("intensity", "intensityOut", (v) => v.toFixed(2));
   bindReadout("stereo", "stereoOut", (v) => v.toFixed(2));
-  // precompThreshold readout is loudness + offset (actual LUFS that the engine sees)
-  el("precompThreshold").addEventListener("input", updatePrecompThreshold);
-  el("loudness").addEventListener("input", updatePrecompThreshold);
-  updatePrecompThreshold();
+  bindReadout("precompThreshold", "precompThresholdOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)} dB`);
   bindReadout("precompWindow", "precompWindowOut", (v) => `${v.toFixed(2)} s`);
   bindReadout("quality", "qualityOut", (v) => `${v.toFixed(0)}`);
   bindReadout("ceiling", "ceilingOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)} dB`);
@@ -71,7 +60,7 @@ function collectSettings() {
     limiterOversample: Math.round(parseFloat(el("oversample").value)),
     limiterMaxIter: Math.round(num("quality")),
     preCompression: chk("precomp"),
-    preCompressionThreshold: num("precompThreshold"),
+    preCompressionThreshold: num("precompThreshold") - num("loudness"), // engine wants offset above loudness
     preCompressionMeanSec: num("precompWindow"),
     msMatchingLevel: num("stereo"),
     eqBandLevels: state.eqBands.slice(),
