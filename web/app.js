@@ -224,7 +224,7 @@ function setupDnd() {
 // EQ Curve (Phase C) -- SVG, 9 draggable dots, catmull-rom smoothed
 // ---------------------------------------------------------------------------
 const EQ_BANDS = ["Sub", "Low", "Lo-mid", "Mid", "Up-mid", "Pres", "High", "V-hi", "Air"];
-const EQ_HZ   = ["<148", "148", "392", "795", "1.5k", "2.5k", "4.3k", "7.3k", "12k+"];
+const EQ_HZ   = ["75", "240", "560", "1.1k", "2k", "3.3k", "5.6k", "9.5k", ">12k"];
 const EQ_W = 540, EQ_H = 164;
 const EQ_PL = 8, EQ_PR = 28, EQ_PT = 20, EQ_PB = 46;
 const EQ_CW = EQ_W - EQ_PL - EQ_PR;
