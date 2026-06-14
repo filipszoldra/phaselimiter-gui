@@ -30,8 +30,12 @@ The binary is NOT in either repo's source tree — it ships prebuilt from phasel
 ### Flags the GUI currently passes to the engine
 
 `--mastering true --mastering_mode mastering5`, intensity wired to
-`--mastering_matching_level` / `--mastering_ms_matching_level` / `--mastering5_mastering_level`,
-`--erb_eval_func_weighting` (Preserve bass), and `--reference` (Target loudness, LUFS).
+`--mastering5_mastering_level`, stereo-field match to `--mastering_ms_matching_level`,
+`--erb_eval_func_weighting` (Preserve bass), `--reference` (Target loudness, LUFS),
+`--ceiling`, `--limiter_internal_oversample`, `--max_iter1`,
+`--pre_compression` / `--pre_compression_threshold` / `--pre_compression_mean_sec`,
+and (when any band ≠ 1.0) `--mastering5_eq_band_levels` (CSV of 9 per-band
+optimizer upper-bound multipliers — see `EQBandLevels [9]float64` in `Mastering` struct).
 The engine exposes many more flags the GUI does not pass — all defined as `DEFINE_*` in
 `../phaselimiter/src/phase_limiter/main.cpp`.
 

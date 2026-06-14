@@ -147,8 +147,36 @@
     <h3>Okno pre‑kompresji (s) <span class="meta">→ <code>--pre_compression_mean_sec</code></span></h3>
     <p class="meta"><b>Zakres:</b> 0,05 … 1,0 s &nbsp;·&nbsp; <b>Domyślnie:</b> 0,2 s</p>
     <p>Długość okna uśredniania. Krótkie okno (0,2 s) potrafi „oddychać” na basie i
-    transjentach. <span class="rec">Wydłużenie do ~0,4 s</span> wygładza działanie i
+    transjentach. <span class=”rec”>Wydłużenie do ~0,4 s</span> wygładza działanie i
     redukuje pompowanie.</p>
+
+    <h3>Siła dopasowania stereo <span class=”meta”>→ <code>--mastering_ms_matching_level</code></span></h3>
+    <p class=”meta”><b>Zakres:</b> 0 … 1 &nbsp;·&nbsp; <b>Domyślnie:</b> 1,0</p>
+    <p>Określa, jak mocno AutoMastering5 przekształca pole stereo (balans M/S) w kierunku wzorca.
+    Przy <code>1,0</code> w pełni dopasowuje szerokość stereo per pasmo. Obniżenie do <span class=”rec”>0,5–0,7</span>
+    zachowuje więcej oryginalnego obrazu stereo i redukuje nadmierne poszerzanie hihatsów
+    lub przestrzenne rozmycie na materiale ze rzadkimi górami.</p>
+
+    <h3>Limit wzmocnienia per pasmo <span class=”meta”>→ <code>--mastering5_eq_band_levels</code></span></h3>
+    <p class=”meta”><b>Zakres:</b> 0,0 … 2,0 per pasmo &nbsp;·&nbsp; <b>Domyślnie:</b> 1,0 (neutralnie)</p>
+    <p>Dziewięć pokręteł skalujących <b>górną granicę wet-gain</b> optymalizatora AutoMastering5
+    (mid + side) dla każdego pasma. Wartość &lt; 1 ogranicza, ile AI może wzmocnić lub poszerzyć
+    dane pasmo; &gt; 1 pozwala na więcej. Ograniczenie jest miękkie (kara w funkcji kosztu).</p>
+    <table>
+      <thead><tr><th>Pasmo</th><th>Zakres</th><th>Kiedy obniżyć</th></tr></thead>
+      <tbody>
+        <tr><td>Sub</td><td>0–148 Hz</td><td>gdy bas ulega deformacji</td></tr>
+        <tr><td>Low</td><td>148–392 Hz</td><td>gdy kopnięcie jest pompowane</td></tr>
+        <tr><td>Low-mid</td><td>392–795 Hz</td><td></td></tr>
+        <tr><td>Mid</td><td>795–1458 Hz</td><td></td></tr>
+        <tr><td>Upper-mid</td><td>1458–2550 Hz</td><td></td></tr>
+        <tr><td>Presence</td><td>2550–4349 Hz</td><td>gdy wokale stają się szorstkie</td></tr>
+        <tr><td>High</td><td>4349–7314 Hz</td><td>gdy talerze są przejaskrawione</td></tr>
+        <tr><td>Very-high</td><td>7314–12k Hz</td><td>gdy hihatsy rozmywają się / poszerzają</td></tr>
+        <tr><td>Air</td><td>12k+ Hz</td><td>przy nagraniach ze rzadkimi górami</td></tr>
+      </tbody>
+    </table>
+    <p>Flaga jest wysyłana tylko gdy co najmniej jedno pasmo różni się od 1,0.</p>
   </section>
 
   <!-- ============ ANALIZA I SUGESTIE ============ -->
@@ -280,6 +308,11 @@
           <td>Distortion / szum na cichym intro lub break</td>
           <td>Analiza → <b>Sekcje ciche</b> + niższa intensywność sekcji (0,15–0,25)</td>
           <td>Włącz <b>Section-aware mastering</b>; jeśli wciąż widoczne — skróć próg pre‑komp.</td>
+        </tr>
+        <tr>
+          <td>Deformacja kopnięcia / hihatsy się poszerzają</td>
+          <td>Limit per pasmo: obniż Sub/Low (kopnięcie) lub High/Very-high/Air (hihats)</td>
+          <td>Połącz z niższą siłą dopasowania stereo</td>
         </tr>
       </tbody>
     </table>

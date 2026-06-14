@@ -30,10 +30,6 @@ Controls how strongly AutoMastering5 reshapes the tone toward the learned refere
 (per-band M/S compressor, tuned by differential-evolution optimisation).
 Lower = gentler, closer to the original.
 
-> **Note.** In `mastering5` mode (the only mode used here) only this flag has any effect.
-> The related `--mastering_matching_level` and `--mastering_ms_matching_level` only apply to
-> `classic` mode and are not passed.
-
 ### Preserve bass → `--erb_eval_func_weighting`
 Enables perceptual weighting in the limiter to protect low frequencies from over-limiting.
 
@@ -85,6 +81,36 @@ Higher = activates less often = more dynamics, less pumping.
 **Range:** 0.05 … 1.0 s · **Default:** 0.2 s
 
 Averaging window length. **Extending to ~0.4 s** smooths the action and reduces pumping.
+
+### Stereo match strength → `--mastering_ms_matching_level`
+**Range:** 0 … 1 · **Default:** 1.0
+
+Controls how strongly AutoMastering5 reshapes the stereo field (M/S balance) toward the
+reference. At `1.0` it fully matches the reference's stereo width per band. Lowering to
+`0.5`–`0.7` preserves more of the original stereo image and reduces over-widening of hihats
+or spatial smearing on sparse material.
+
+### Per-band boost limit → `--mastering5_eq_band_levels`
+**Range:** 0.0 … 2.0 per band · **Default:** 1.0 (neutral)
+
+Nine spinbuttons — one per engine frequency band — scaling the AutoMastering5 optimizer's
+**wet-gain upper bound** for that band (mid + side). Values < 1 reduce how much the AI is
+allowed to boost or widen that band; > 1 permit more. The constraint is soft (a penalty
+in the optimizer's cost function), so the effect is proportional rather than a hard clip.
+
+| Band | Frequency range | Typical use |
+|---|---|---|
+| Sub | 0–148 Hz | leave at 1.0 unless bass is deformed |
+| Low | 148–392 Hz | reduce if kick body gets pumped |
+| Low-mid | 392–795 Hz | |
+| Mid | 795–1458 Hz | |
+| Upper-mid | 1458–2550 Hz | |
+| Presence | 2550–4349 Hz | reduce if vocals become harsh |
+| High | 4349–7314 Hz | reduce if cymbals are over-brightened |
+| Very-high | 7314–12k Hz | reduce if hihats smear / over-widen |
+| Air | 12k+ Hz | reduce on tracks with sparse highs |
+
+The flag is only sent when at least one band differs from 1.0. All-1.0 = engine default.
 
 ---
 
@@ -164,3 +190,4 @@ and all other fields are preserved verbatim.
 | Smearing / loss of clarity | Limiter quality → **200** | Lower mastering intensity |
 | Wrong tone — too bright or dark | Reference tone (EQ) → tilt sliders | Start with ±2 dB; verify with before/after report |
 | Distortion on quiet intro / break | Detected sections + section intensity 0.15–0.25 | Enable Section-aware mastering |
+| Kick deformation / hihat over-widening | Per-band boost limit: lower Sub/Low (kick) or High/Very-high/Air (hihats) | Combine with lower Stereo match strength |

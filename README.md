@@ -17,6 +17,8 @@ over the mastering output — **without recompiling the C++ DSP engine**.
 | Feature | Description |
 |---|---|
 | **Advanced glitch-reduction controls** | Limiter oversampling (1×/2×/4×), limiter quality (iterations), true-peak ceiling, pre-compression on/off + threshold + smoothing window |
+| **Stereo match strength** | `--mastering_ms_matching_level` (0 = ignore stereo-field, 1 = full match); lower reduces over-widening on sparse material |
+| **Per-band boost limit (9-band EQ)** | 9 spinbuttons (0.0–2.0, default 1.0) mapping to the engine's `--mastering5_eq_band_levels` flag — scales the AutoMastering5 optimizer's per-band wet-gain upper bound; lower = less AI reshaping in that band; useful for taming kick deformation or hihat over-widening |
 | **Diagnostic "Limiter only" mode** | Bypasses AutoMastering5 for A/B testing whether quiet-section distortion is caused by the reference-matching stage |
 | **"Analyze & suggest settings"** | Runs the bundled `audio_analyzer` on any audio file and auto-fills every control with gentle, glitch-avoiding settings derived from LRA, true-peak and spectral balance |
 | **Detected quiet sections** | Automatically finds fragments that sit >9 LU below the loud sections; displayed in an editable table; used by section-aware mastering |

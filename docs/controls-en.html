@@ -124,6 +124,34 @@
     <h3>Pre-comp window (s) <span class="meta">→ <code>--pre_compression_mean_sec</code></span></h3>
     <p class="meta"><b>Range:</b> 0.05 … 1.0 s &nbsp;·&nbsp; <b>Default:</b> 0.2 s</p>
     <p>Averaging window. <span class="rec">Extending to ~0.4 s</span> reduces pumping.</p>
+
+    <h3>Stereo match strength <span class="meta">→ <code>--mastering_ms_matching_level</code></span></h3>
+    <p class="meta"><b>Range:</b> 0 … 1 &nbsp;·&nbsp; <b>Default:</b> 1.0</p>
+    <p>Controls how strongly AutoMastering5 reshapes the stereo field (M/S balance) toward
+    the reference. At <code>1.0</code> it fully matches the reference stereo width per band.
+    Lowering to <span class="rec">0.5–0.7</span> preserves more of the original stereo image
+    and reduces over-widening of hihats or spatial smearing on sparse material.</p>
+
+    <h3>Per-band boost limit <span class="meta">→ <code>--mastering5_eq_band_levels</code></span></h3>
+    <p class="meta"><b>Range:</b> 0.0 … 2.0 per band &nbsp;·&nbsp; <b>Default:</b> 1.0 (neutral)</p>
+    <p>Nine spinbuttons scaling the AutoMastering5 optimizer's <b>wet-gain upper bound</b>
+    (mid + side) for each frequency band. Values &lt; 1 reduce how much the AI may boost or
+    widen that band; &gt; 1 permit more. The constraint is soft (a penalty in the cost function).</p>
+    <table>
+      <thead><tr><th>Band</th><th>Frequency</th><th>When to lower</th></tr></thead>
+      <tbody>
+        <tr><td>Sub</td><td>0–148 Hz</td><td>bass deformation</td></tr>
+        <tr><td>Low</td><td>148–392 Hz</td><td>kick body pumping</td></tr>
+        <tr><td>Low-mid</td><td>392–795 Hz</td><td></td></tr>
+        <tr><td>Mid</td><td>795–1458 Hz</td><td></td></tr>
+        <tr><td>Upper-mid</td><td>1458–2550 Hz</td><td></td></tr>
+        <tr><td>Presence</td><td>2550–4349 Hz</td><td>harsh vocals</td></tr>
+        <tr><td>High</td><td>4349–7314 Hz</td><td>over-brightened cymbals</td></tr>
+        <tr><td>Very-high</td><td>7314–12k Hz</td><td>hihat smear / over-widening</td></tr>
+        <tr><td>Air</td><td>12k+ Hz</td><td>tracks with sparse highs</td></tr>
+      </tbody>
+    </table>
+    <p>The flag is only sent when at least one band differs from 1.0.</p>
   </section>
 
   <!-- ============ ANALYSIS ============ -->
@@ -241,6 +269,11 @@
           <td>Distortion on quiet intro / break</td>
           <td>Detected sections + section intensity 0.15–0.25</td>
           <td>Enable Section-aware mastering</td>
+        </tr>
+        <tr>
+          <td>Kick deformation / hihat over-widening</td>
+          <td>Per-band boost limit: lower Sub/Low (kick) or High/Very-high/Air (hihats)</td>
+          <td>Combine with lower Stereo match strength</td>
         </tr>
       </tbody>
     </table>

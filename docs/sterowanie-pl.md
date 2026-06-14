@@ -30,10 +30,6 @@ Określa, jak mocno AutoMastering5 przekształca brzmienie w stronę wyuczonego 
 (korekcja pasmowa + kompresja M/S, dobierana optymalizacją różnicowo‑ewolucyjną).
 Niżej = delikatniej, bliżej oryginału.
 
-> **Uwaga techniczna.** W trybie `mastering5` (jedynym używanym przez tę aplikację) działa
-> **tylko** ta flaga. Pokrewne `--mastering_matching_level` i `--mastering_ms_matching_level`
-> dotyczą wyłącznie trybu `classic` — tutaj są nieaktywne.
-
 ### Zachowaj bas (Preserve bass) → `--erb_eval_func_weighting`
 Włącza percepcyjne ważenie błędu limitera chroniące niskie częstotliwości.
 
@@ -86,6 +82,36 @@ Wyżej = kompresor reaguje rzadziej = więcej dynamiki, mniej pompowania.
 **Zakres:** 0,05 … 1,0 s · **Domyślnie:** 0,2 s
 
 Długość okna uśredniania. **Wydłużenie do ~0,4 s** wygładza działanie i redukuje pompowanie.
+
+### Siła dopasowania stereo → `--mastering_ms_matching_level`
+**Zakres:** 0 … 1 · **Domyślnie:** 1,0
+
+Określa, jak mocno AutoMastering5 przekształca pole stereo (balans M/S) w kierunku wzorca.
+Przy `1,0` w pełni dopasowuje szerokość stereo per pasmo do wzorca referencyjnego. Obniżenie do
+`0,5`–`0,7` zachowuje więcej oryginalnego obrazu stereo i redukuje nadmierne poszerzanie
+hihatsów lub przestrzenne rozmycie na materiale ze rzadkimi górami.
+
+### Limit wzmocnienia per pasmo → `--mastering5_eq_band_levels`
+**Zakres:** 0,0 … 2,0 per pasmo · **Domyślnie:** 1,0 (neutralnie)
+
+Dziewięć pokręteł — po jednym na każde pasmo częstotliwościowe silnika — skalujących **górną
+granicę wet-gain** optymalizatora AutoMastering5 (mid + side). Wartość < 1 ogranicza, ile AI
+może wzmocnić lub poszerzyć dane pasmo; > 1 pozwala na więcej. Ograniczenie jest miękkie
+(kara w funkcji kosztu), więc efekt jest proporcjonalny, nie twardy.
+
+| Pasmo | Zakres | Kiedy obniżyć |
+|---|---|---|
+| Sub | 0–148 Hz | gdy bas ulega deformacji |
+| Low | 148–392 Hz | gdy kopnięcie kopyta jest pompowane |
+| Low-mid | 392–795 Hz | |
+| Mid | 795–1458 Hz | |
+| Upper-mid | 1458–2550 Hz | |
+| Presence | 2550–4349 Hz | gdy wokale stają się szorstkie |
+| High | 4349–7314 Hz | gdy talerze są przejaskrawione |
+| Very-high | 7314–12k Hz | gdy hihatsy rozmywają się / poszerzają |
+| Air | 12k+ Hz | przy nagraniach ze rzadkimi górami |
+
+Flaga jest wysyłana tylko gdy co najmniej jedno pasmo różni się od 1,0. Wszystkie 1,0 = domyślne zachowanie silnika.
 
 ---
 
@@ -164,3 +190,4 @@ i inne pozostają niezmienione.
 | Rozmycie / utrata klarowności | Jakość limitera → **200** | Niższa intensywność masteringu |
 | Zła barwa — za jasno lub ciemno | Ton referencyjny (EQ) → przechyl suwaki | Zacznij od ±2 dB; użyj raportu przed/po |
 | Distortion na cichym intro / break | Sekcje ciche + intensywność sekcji 0,15–0,25 | Włącz Section-aware mastering |
+| Deformacja kopnięcia / hihatsy się poszerzają | Limit per pasmo: obniż Sub/Low (kopnięcie) lub High/Very-high/Air (hihats) | Połącz z niższą siłą dopasowania stereo |
