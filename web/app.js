@@ -38,11 +38,22 @@ function bindReadout(id, outId, fmt) {
   update();
 }
 
+function updatePrecompThreshold() {
+  const loudness = parseFloat(el("loudness").value);
+  const offset   = parseFloat(el("precompThreshold").value);
+  const actual   = loudness + offset;
+  const sign     = actual < 0 ? "−" : "";
+  el("precompThresholdOut").textContent = `${sign}${Math.abs(actual).toFixed(0)} LUFS`;
+}
+
 function setupReadouts() {
   bindReadout("loudness", "loudnessOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)} LUFS`);
   bindReadout("intensity", "intensityOut", (v) => v.toFixed(2));
   bindReadout("stereo", "stereoOut", (v) => v.toFixed(2));
-  bindReadout("precompThreshold", "precompThresholdOut", (v) => `${v.toFixed(1)} dB`);
+  // precompThreshold readout is loudness + offset (actual LUFS that the engine sees)
+  el("precompThreshold").addEventListener("input", updatePrecompThreshold);
+  el("loudness").addEventListener("input", updatePrecompThreshold);
+  updatePrecompThreshold();
   bindReadout("precompWindow", "precompWindowOut", (v) => `${v.toFixed(2)} s`);
   bindReadout("quality", "qualityOut", (v) => `${v.toFixed(0)}`);
   bindReadout("ceiling", "ceilingOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)} dB`);
