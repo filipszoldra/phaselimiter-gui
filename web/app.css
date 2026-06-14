@@ -7,9 +7,9 @@
   --line-soft: #2a313b;
   --text: #e9e7e3;
   --muted: #99a1ad;
-  --accent: #d97757;
-  --accent-soft: #e09a82;
-  --accent-dim: #7a4636;
+  --accent: #d6409f;
+  --accent-soft: #ec7ac4;
+  --accent-dim: #5e2350;
   --ok: #6bbf73;
   --warn: #e0b341;
   --radius: 14px;
@@ -56,7 +56,7 @@ em.muted { font-style: normal; font-size: 0.86em; }
   width: 38px; height: 38px; border-radius: 11px;
   display: grid; place-items: center;
   background: radial-gradient(circle at 30% 25%, var(--accent-soft), var(--accent) 70%);
-  color: #2a160f; font-size: 18px; box-shadow: var(--shadow);
+  color: #2a0f20; font-size: 18px; box-shadow: var(--shadow);
 }
 .brand h1 { margin: 0; font-size: 17px; letter-spacing: 0.2px; }
 .tagline { margin: 1px 0 0; font-size: 11.5px; color: var(--muted); }
@@ -71,7 +71,7 @@ em.muted { font-style: normal; font-size: 0.86em; }
 }
 .btn:hover { background: #2c333e; border-color: #3c4552; }
 .btn:active { transform: translateY(1px); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #2a160f; font-weight: 600; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #2a0f20; font-weight: 600; }
 .btn.primary:hover { background: var(--accent-soft); }
 .btn.ghost { background: transparent; }
 .btn.small { padding: 6px 11px; font-size: 12px; }
@@ -132,7 +132,7 @@ input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; h
   background: #2b323d; border-radius: 99px; cursor: pointer; }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
   width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
-  border: 2px solid #2a160f; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  border: 2px solid #2a0f20; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
 input[type="range"]::-webkit-slider-thumb:hover { background: var(--accent-soft); }
 
 /* checkbox */
@@ -145,14 +145,14 @@ details.diag summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 /* ---------- files ---------- */
 .dropzone { border: 1.5px dashed var(--line); border-radius: var(--radius-sm);
   padding: 18px; text-align: center; transition: border-color .15s, background .15s; }
-.dropzone.drag { border-color: var(--accent); background: rgba(217,119,87,.07); }
+.dropzone.drag { border-color: var(--accent); background: rgba(214,64,159,.08); }
 .drop-hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
 .chip { display: inline-flex; align-items: center; gap: 8px; background: var(--card-2);
   border: 1px solid var(--line); border-radius: 99px; padding: 5px 6px 5px 12px; font-size: 12.5px; }
 .chip button { border: none; background: #39414d; color: var(--text); width: 18px; height: 18px;
   border-radius: 50%; cursor: pointer; line-height: 1; font-size: 12px; }
-.chip button:hover { background: var(--accent); color: #2a160f; }
+.chip button:hover { background: var(--accent); color: #2a0f20; }
 
 /* ---------- placeholders for C/D ---------- */
 .eq-block { margin: 16px 0 6px; }

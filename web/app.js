@@ -2,7 +2,7 @@
 
 // ---------------------------------------------------------------------------
 // Go bridge with mock fallback. When the bound functions (injected by
-// go-webview2) are missing — i.e. opened in a plain browser / Playwright — we
+// go-webview2) are missing (opened in a plain browser / Playwright), we
 // fall back to mocks so the layout and interactions stay testable.
 // ---------------------------------------------------------------------------
 const HAS_GO = typeof window.plStartMastering === "function";
@@ -154,7 +154,7 @@ function updateOverallProgress() {
   if (!active.length) {
     const done = jobs.filter((j) => j.status === "succeeded").length;
     el("progressFill").style.width = jobs.length ? "100%" : "0%";
-    el("progressLabel").textContent = jobs.length ? `Done — ${done}/${jobs.length} succeeded` : "Idle";
+    el("progressLabel").textContent = jobs.length ? `Done: ${done}/${jobs.length} succeeded` : "Idle";
     if (jobs.length) setTimeout(() => strip.classList.add("hidden"), 1500);
     return;
   }
@@ -177,7 +177,7 @@ async function startMastering() {
 
 function flash(node) {
   node.animate(
-    [{ boxShadow: "0 0 0 0 rgba(217,119,87,.6)" }, { boxShadow: "0 0 0 8px rgba(217,119,87,0)" }],
+    [{ boxShadow: "0 0 0 0 rgba(214,64,159,.6)" }, { boxShadow: "0 0 0 8px rgba(214,64,159,0)" }],
     { duration: 600 }
   );
 }

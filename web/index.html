@@ -34,7 +34,7 @@
       <div class="card-head"><h2>Files</h2><span class="muted">input &amp; output</span></div>
       <div id="dropzone" class="dropzone">
         <div id="fileChips" class="chips"></div>
-        <p id="dropHint" class="drop-hint">No files yet — drop audio here or</p>
+        <p id="dropHint" class="drop-hint">No files yet. Drop audio here, or</p>
         <button id="addFilesBtn" class="btn">+ Add files</button>
       </div>
       <div class="field-row">
@@ -80,17 +80,17 @@
 
       <div class="eq-block">
         <div class="eq-head">
-          <span>Per-band boost limit <em class="muted">— drag dots (0–2, 1 = neutral)</em></span>
+          <span>Per-band boost limit <em class="muted">drag dots (0-2, 1 = neutral)</em></span>
           <button id="eqReset" class="btn tiny">Reset</button>
         </div>
-        <div id="eqCurve" class="eq-placeholder">EQ curve — interactive in Phase C</div>
+        <div id="eqCurve" class="eq-placeholder">EQ curve (interactive in Phase C)</div>
       </div>
 
       <label class="check"><input id="preserveBass" type="checkbox" /> <span>Preserve bass</span></label>
 
       <details class="diag">
         <summary>Diagnostic</summary>
-        <label class="check"><input id="limiterOnly" type="checkbox" /> <span>Limiter only — bypass AutoMastering5 (isolate limiter artifacts)</span></label>
+        <label class="check"><input id="limiterOnly" type="checkbox" /> <span>Limiter only: bypass AutoMastering5 (isolate limiter artifacts)</span></label>
       </details>
     </section>
 
@@ -142,7 +142,7 @@
     <section class="card">
       <div class="card-head"><span class="step">6</span><h2>Section-aware mastering</h2><span class="muted">rescue quiet parts</span></div>
       <label class="check"><input id="sectionEnable" type="checkbox" /> <span>Re-render quiet sections gently</span></label>
-      <div id="sectionsChart" class="sections-placeholder">Loudness timeline &amp; draggable sections — interactive in Phase D (run Analyze first)</div>
+      <div id="sectionsChart" class="sections-placeholder">Loudness timeline &amp; draggable sections (interactive in Phase D, run Analyze first)</div>
       <label class="field slider">
         <span class="slider-top">Section intensity <output id="sectionIntensityOut">0.25</output></span>
         <input id="sectionIntensity" type="range" min="0" max="1" step="0.05" value="0.25" />
@@ -159,7 +159,7 @@
 
   <aside id="analysisDrawer" class="analysis-drawer hidden">
     <div class="drawer-head"><h2>Track analysis</h2><button id="analysisClose" class="btn ghost small">Close</button></div>
-    <p class="muted">Spectrogram, loudness timeline and graphs — Phase E.</p>
+    <p class="muted">Spectrogram, loudness timeline and graphs (Phase E).</p>
   </aside>
 
   <script src="app.js"></script>
