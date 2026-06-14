@@ -20,6 +20,7 @@ jobs:
         run: |
           mkdir -p /tmp/results
           mv phaselimiter-gui.exe phaselimiter-gui-console.exe /tmp/results/
+          cp go.mod go.sum /tmp/results/ || true
           [ -d licenses ] && cp -r licenses /tmp/results/ || true
       - uses: actions/upload-artifact@v4
         with:
