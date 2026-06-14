@@ -43,7 +43,7 @@ function updatePrecompThreshold() {
   const offset   = parseFloat(el("precompThreshold").value);
   const actual   = loudness + offset;
   const sign     = actual < 0 ? "−" : "";
-  el("precompThresholdOut").textContent = `${sign}${Math.abs(actual).toFixed(0)} LUFS`;
+  el("precompThresholdOut").textContent = `${sign}${Math.abs(actual).toFixed(0)} dB`;
 }
 
 function setupReadouts() {
