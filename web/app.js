@@ -221,18 +221,159 @@ function setupDnd() {
 }
 
 // ---------------------------------------------------------------------------
+// EQ Curve (Phase C) -- SVG, 9 draggable dots, catmull-rom smoothed
+// ---------------------------------------------------------------------------
+const EQ_BANDS = ["Sub", "Low", "Lo-mid", "Mid", "Up-mid", "Pres", "High", "V-hi", "Air"];
+const EQ_W = 540, EQ_H = 148;
+const EQ_PL = 8, EQ_PR = 28, EQ_PT = 20, EQ_PB = 30;
+const EQ_CW = EQ_W - EQ_PL - EQ_PR;
+const EQ_CH = EQ_H - EQ_PT - EQ_PB;
+
+function eqX(i) { return EQ_PL + (i / 8) * EQ_CW; }
+function eqY(v) { return EQ_PT + EQ_CH * (1 - v / 2); }
+function eqVfromY(y) { return Math.max(0, Math.min(2, (1 - (y - EQ_PT) / EQ_CH) * 2)); }
+
+function eqSmooth(pts) {
+  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i];
+    const p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6, cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6, cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)},${cp2x.toFixed(1)} ${cp2y.toFixed(1)},${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+let _eqDotEls = [], _eqValEls = [], _eqPathEl = null, _eqAreaEl = null;
+
+function initEQ() {
+  const container = el("eqCurve");
+  container.innerHTML = "";
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${EQ_W} ${EQ_H}`);
+  svg.classList.add("eq-svg");
+
+  // horizontal guides at 0, 0.5, 1, 1.5, 2
+  [0, 0.5, 1, 1.5, 2].forEach(v => {
+    const ln = document.createElementNS(ns, "line");
+    const y = eqY(v);
+    ln.setAttribute("x1", EQ_PL); ln.setAttribute("x2", EQ_W - EQ_PR);
+    ln.setAttribute("y1", y); ln.setAttribute("y2", y);
+    ln.setAttribute("class", v === 1 ? "eq-guide eq-neutral" : "eq-guide");
+    svg.appendChild(ln);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", EQ_W - EQ_PR + 5); t.setAttribute("y", y);
+    t.setAttribute("class", "eq-scale");
+    t.textContent = v % 1 ? v.toFixed(1) : v.toFixed(0);
+    svg.appendChild(t);
+  });
+
+  // area fill between curve and neutral line
+  const area = document.createElementNS(ns, "path");
+  area.setAttribute("class", "eq-area");
+  svg.appendChild(area);
+  _eqAreaEl = area;
+
+  // smooth curve line
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("class", "eq-curve");
+  svg.appendChild(path);
+  _eqPathEl = path;
+
+  // one group per band: hit circle, visible dot, value label, band name
+  _eqDotEls = []; _eqValEls = [];
+  state.eqBands.forEach((v, i) => {
+    const cx = eqX(i), cy = eqY(v);
+
+    const hit = document.createElementNS(ns, "circle");
+    hit.setAttribute("cx", cx); hit.setAttribute("cy", cy); hit.setAttribute("r", "16");
+    hit.setAttribute("class", "eq-hit");
+
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("r", "7");
+    dot.setAttribute("class", "eq-dot");
+
+    const valTxt = document.createElementNS(ns, "text");
+    valTxt.setAttribute("x", cx); valTxt.setAttribute("y", cy - 13);
+    valTxt.setAttribute("class", "eq-val");
+    valTxt.textContent = v.toFixed(2);
+
+    const bandTxt = document.createElementNS(ns, "text");
+    bandTxt.setAttribute("x", cx); bandTxt.setAttribute("y", EQ_H - 2);
+    bandTxt.setAttribute("class", "eq-band-label");
+    bandTxt.textContent = EQ_BANDS[i];
+
+    svg.appendChild(dot);
+    svg.appendChild(valTxt);
+    svg.appendChild(bandTxt);
+    svg.appendChild(hit);   // last = on top, catches all pointer events
+    _eqDotEls.push({ hit, dot });
+    _eqValEls.push(valTxt);
+
+    let dragging = false;
+    hit.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); dragging = true;
+      hit.setPointerCapture(e.pointerId);
+      dot.classList.add("active");
+    });
+    hit.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const rect = svg.getBoundingClientRect();
+      const rawY = (e.clientY - rect.top) / rect.height * EQ_H;
+      const newV = Math.round(eqVfromY(rawY) * 100) / 100;
+      if (state.eqBands[i] === newV) return;
+      state.eqBands[i] = newV;
+      updateEQ();
+    });
+    hit.addEventListener("pointerup", () => { dragging = false; dot.classList.remove("active"); });
+    hit.addEventListener("dblclick", () => { state.eqBands[i] = 1; updateEQ(); });
+  });
+
+  container.appendChild(svg);
+  updateEQ();
+}
+
+function updateEQ() {
+  const pts = state.eqBands.map((v, i) => ({ x: eqX(i), y: eqY(v) }));
+  const curvePath = eqSmooth(pts);
+  _eqPathEl.setAttribute("d", curvePath);
+
+  // area between curve and neutral (y=1 line)
+  const ny = eqY(1);
+  const first = pts[0], last = pts[pts.length - 1];
+  _eqAreaEl.setAttribute("d",
+    curvePath + ` L ${last.x.toFixed(1)} ${ny.toFixed(1)} L ${first.x.toFixed(1)} ${ny.toFixed(1)} Z`
+  );
+
+  _eqDotEls.forEach(({ hit, dot }, i) => {
+    const cx = eqX(i), cy = eqY(state.eqBands[i]);
+    hit.setAttribute("cx", cx); hit.setAttribute("cy", cy);
+    dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+    _eqValEls[i].setAttribute("x", cx);
+    _eqValEls[i].setAttribute("y", (cy - 13).toFixed(1));
+    _eqValEls[i].textContent = state.eqBands[i].toFixed(2);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Wire up
 // ---------------------------------------------------------------------------
 async function init() {
   setupReadouts();
   setupDnd();
+  initEQ();
   el("addFilesBtn").addEventListener("click", addFiles);
   el("browseDirBtn").addEventListener("click", async () => {
     const d = await bridge.pickOutputDir();
     if (d) el("outputDir").value = d;
   });
   el("masterBtn").addEventListener("click", startMastering);
-  el("eqReset").addEventListener("click", () => { state.eqBands = state.eqBands.map(() => 1); });
+  el("eqReset").addEventListener("click", () => {
+    state.eqBands = state.eqBands.map(() => 1);
+    updateEQ();
+  });
   el("analysisToggle").addEventListener("click", () => el("analysisDrawer").classList.toggle("hidden"));
   el("analysisClose").addEventListener("click", () => el("analysisDrawer").classList.add("hidden"));
 
