@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-
-	"github.com/gotk3/gotk3/gtk"
 )
 
 // oversampleIndex maps a limiter-oversample factor to the combo box index
@@ -18,14 +16,6 @@ func oversampleIndex(v int) int {
 	default:
 		return 0
 	}
-}
-
-// showInfoDialog shows a modal informational message.
-func showInfoDialog(parent gtk.IWindow, title, msg string) {
-	d := gtk.MessageDialogNew(parent, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, "%s", msg)
-	d.SetTitle(title)
-	d.Run()
-	d.Destroy()
 }
 
 // formatSuggestionMessage renders the applied settings, the reasoning, and any

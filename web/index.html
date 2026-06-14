@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>phaselimiter</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">◆</div>
+      <div>
+        <h1>phaselimiter</h1>
+        <p class="tagline">local AI mastering · the chain, step by step</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="analyzeBtn" class="btn ghost" title="Analyze a track and suggest settings">Analyze</button>
+      <button id="analysisToggle" class="btn ghost">Analysis ▾</button>
+      <button id="masterBtn" class="btn primary">Master</button>
+    </div>
+  </header>
+
+  <div id="progressStrip" class="progress-strip hidden">
+    <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+    <span id="progressLabel" class="progress-label">Idle</span>
+  </div>
+
+  <main class="scroll">
+
+    <!-- FILES -->
+    <section class="card">
+      <div class="card-head"><h2>Files</h2><span class="muted">input &amp; output</span></div>
+      <div id="dropzone" class="dropzone">
+        <div id="fileChips" class="chips"></div>
+        <p id="dropHint" class="drop-hint">No files yet — drop audio here or</p>
+        <button id="addFilesBtn" class="btn">+ Add files</button>
+      </div>
+      <div class="field-row">
+        <label class="field grow">
+          <span>Output folder</span>
+          <div class="input-with-btn">
+            <input id="outputDir" type="text" spellcheck="false" />
+            <button id="browseDirBtn" class="btn small">Browse</button>
+          </div>
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field grow">
+          <span>Output filename <em class="muted">(single file)</em></span>
+          <input id="outputName" type="text" placeholder="track_output.wav" spellcheck="false" />
+        </label>
+      </div>
+    </section>
+
+    <!-- 1 LOUDNESS -->
+    <section class="card">
+      <div class="card-head"><span class="step">1</span><h2>Loudness target</h2><span class="muted">biggest lever</span></div>
+      <label class="field slider">
+        <span class="slider-top">Target loudness <output id="loudnessOut">−14 LUFS</output></span>
+        <input id="loudness" type="range" min="-20" max="0" step="0.5" value="-14" />
+        <span class="scale"><i>−20 (quiet)</i><i>0 (loud)</i></span>
+      </label>
+    </section>
+
+    <!-- 2 AUTOMASTERING5 -->
+    <section class="card">
+      <div class="card-head"><span class="step">2</span><h2>AutoMastering5</h2><span class="muted">tone &amp; stereo</span></div>
+      <div class="grid2">
+        <label class="field slider">
+          <span class="slider-top">Intensity <output id="intensityOut">0.50</output></span>
+          <input id="intensity" type="range" min="0" max="1" step="0.01" value="0.5" />
+        </label>
+        <label class="field slider">
+          <span class="slider-top">Stereo match <output id="stereoOut">1.00</output></span>
+          <input id="stereo" type="range" min="0" max="1" step="0.05" value="1" />
+        </label>
+      </div>
+
+      <div class="eq-block">
+        <div class="eq-head">
+          <span>Per-band boost limit <em class="muted">— drag dots (0–2, 1 = neutral)</em></span>
+          <button id="eqReset" class="btn tiny">Reset</button>
+        </div>
+        <div id="eqCurve" class="eq-placeholder">EQ curve — interactive in Phase C</div>
+      </div>
+
+      <label class="check"><input id="preserveBass" type="checkbox" /> <span>Preserve bass</span></label>
+
+      <details class="diag">
+        <summary>Diagnostic</summary>
+        <label class="check"><input id="limiterOnly" type="checkbox" /> <span>Limiter only — bypass AutoMastering5 (isolate limiter artifacts)</span></label>
+      </details>
+    </section>
+
+    <!-- 3 PRE-COMPRESSION -->
+    <section class="card">
+      <div class="card-head"><span class="step">3</span><h2>Pre-compression</h2><span class="muted">tames pumping</span></div>
+      <label class="check"><input id="precomp" type="checkbox" checked /> <span>Enabled</span></label>
+      <div class="grid2">
+        <label class="field slider">
+          <span class="slider-top">Threshold <output id="precompThresholdOut">6.0 dB</output></span>
+          <input id="precompThreshold" type="range" min="0" max="18" step="0.5" value="6" />
+        </label>
+        <label class="field slider">
+          <span class="slider-top">Window <output id="precompWindowOut">0.20 s</output></span>
+          <input id="precompWindow" type="range" min="0.05" max="1" step="0.05" value="0.2" />
+        </label>
+      </div>
+    </section>
+
+    <!-- 4 PHASE LIMITER -->
+    <section class="card">
+      <div class="card-head"><span class="step">4</span><h2>Phase limiter</h2><span class="muted">the crunch stage</span></div>
+      <div class="grid2">
+        <label class="field">
+          <span>Oversampling</span>
+          <select id="oversample">
+            <option value="1" selected>1× (fast)</option>
+            <option value="2">2×</option>
+            <option value="4">4× (cleanest)</option>
+          </select>
+        </label>
+        <label class="field slider">
+          <span class="slider-top">Quality (iterations) <output id="qualityOut">100</output></span>
+          <input id="quality" type="range" min="40" max="400" step="10" value="100" />
+        </label>
+      </div>
+    </section>
+
+    <!-- 5 CEILING -->
+    <section class="card">
+      <div class="card-head"><span class="step">5</span><h2>Ceiling</h2><span class="muted">true-peak headroom</span></div>
+      <label class="field slider">
+        <span class="slider-top">True-peak ceiling <output id="ceilingOut">−1.0 dB</output></span>
+        <input id="ceiling" type="range" min="-3" max="0" step="0.1" value="-1" />
+      </label>
+    </section>
+
+    <!-- 6 SECTION-AWARE -->
+    <section class="card">
+      <div class="card-head"><span class="step">6</span><h2>Section-aware mastering</h2><span class="muted">rescue quiet parts</span></div>
+      <label class="check"><input id="sectionEnable" type="checkbox" /> <span>Re-render quiet sections gently</span></label>
+      <div id="sectionsChart" class="sections-placeholder">Loudness timeline &amp; draggable sections — interactive in Phase D (run Analyze first)</div>
+      <label class="field slider">
+        <span class="slider-top">Section intensity <output id="sectionIntensityOut">0.25</output></span>
+        <input id="sectionIntensity" type="range" min="0" max="1" step="0.05" value="0.25" />
+      </label>
+    </section>
+
+    <!-- JOBS -->
+    <section class="card">
+      <div class="card-head"><h2>Queue</h2><span class="muted">mastering jobs</span></div>
+      <div id="jobList" class="job-list"><p class="muted empty">No jobs yet.</p></div>
+    </section>
+
+  </main>
+
+  <aside id="analysisDrawer" class="analysis-drawer hidden">
+    <div class="drawer-head"><h2>Track analysis</h2><button id="analysisClose" class="btn ghost small">Close</button></div>
+    <p class="muted">Spectrogram, loudness timeline and graphs — Phase E.</p>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>
