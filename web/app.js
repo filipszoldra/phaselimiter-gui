@@ -39,13 +39,13 @@ function bindReadout(id, outId, fmt) {
 }
 
 function setupReadouts() {
-  bindReadout("loudness", "loudnessOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)} LUFS`);
+  bindReadout("loudness", "loudnessOut", (v) => `${v < 0 ? "–" : ""}${Math.abs(v).toFixed(0)} LUFS`);
   bindReadout("intensity", "intensityOut", (v) => v.toFixed(2));
   bindReadout("stereo", "stereoOut", (v) => v.toFixed(2));
   bindReadout("precompThreshold", "precompThresholdOut", (v) => `+${v.toFixed(1)} dB`);
   bindReadout("precompWindow", "precompWindowOut", (v) => `${v.toFixed(2)} s`);
   bindReadout("quality", "qualityOut", (v) => `${v.toFixed(0)}`);
-  bindReadout("ceiling", "ceilingOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)} dB`);
+  bindReadout("ceiling", "ceilingOut", (v) => `${v < 0 ? "–" : ""}${Math.abs(v).toFixed(1)} dB`);
   bindReadout("sectionIntensity", "sectionIntensityOut", (v) => v.toFixed(2));
 }
 
