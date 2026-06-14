@@ -42,7 +42,7 @@ function setupReadouts() {
   bindReadout("loudness", "loudnessOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)} LUFS`);
   bindReadout("intensity", "intensityOut", (v) => v.toFixed(2));
   bindReadout("stereo", "stereoOut", (v) => v.toFixed(2));
-  bindReadout("precompThreshold", "precompThresholdOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)} dB`);
+  bindReadout("precompThreshold", "precompThresholdOut", (v) => `+${v.toFixed(1)} dB`);
   bindReadout("precompWindow", "precompWindowOut", (v) => `${v.toFixed(2)} s`);
   bindReadout("quality", "qualityOut", (v) => `${v.toFixed(0)}`);
   bindReadout("ceiling", "ceilingOut", (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)} dB`);
@@ -60,7 +60,7 @@ function collectSettings() {
     limiterOversample: Math.round(parseFloat(el("oversample").value)),
     limiterMaxIter: Math.round(num("quality")),
     preCompression: chk("precomp"),
-    preCompressionThreshold: num("precompThreshold") - num("loudness"), // engine wants offset above loudness
+    preCompressionThreshold: num("precompThreshold"),
     preCompressionMeanSec: num("precompWindow"),
     msMatchingLevel: num("stereo"),
     eqBandLevels: state.eqBands.slice(),

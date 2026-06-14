@@ -100,8 +100,8 @@
       <label class="check"><input id="precomp" type="checkbox" checked /> <span>Enabled</span></label>
       <div class="grid2">
         <label class="field slider">
-          <span class="slider-top">Threshold <output id="precompThresholdOut">−8 dB</output></span>
-          <input id="precompThreshold" type="range" min="-30" max="0" step="1" value="-8" />
+          <span class="slider-top">Threshold offset <em class="muted">(above track loudness)</em> <output id="precompThresholdOut">+6 dB</output></span>
+          <input id="precompThreshold" type="range" min="0" max="18" step="0.5" value="6" />
         </label>
         <label class="field slider">
           <span class="slider-top">Window <output id="precompWindowOut">0.20 s</output></span>
