@@ -620,6 +620,23 @@ function buildSectionsChart() {
     _secHandleEls.push(groupEls);
   });
 
+  // Playhead line (on top of everything)
+  const phLine = document.createElementNS(ns, "line");
+  phLine.setAttribute("y1", String(SEC_PT)); phLine.setAttribute("y2", String(SEC_PT + SEC_CH));
+  phLine.setAttribute("x1", "0"); phLine.setAttribute("x2", "0");
+  phLine.setAttribute("class", "sec-playhead");
+  phLine.setAttribute("visibility", "hidden");
+  svg.appendChild(phLine);
+  _playheadEl = phLine;
+
+  // Click on chart → seek (ignore hits on drag handles)
+  svg.addEventListener("click", (e) => {
+    if (e.target.classList.contains("sec-hit")) return;
+    const rect = svg.getBoundingClientRect();
+    const sec = secSecFromX((e.clientX - rect.left) / rect.width * SEC_W);
+    playfrom(sec);
+  });
+
   container.appendChild(svg);
 }
 
@@ -641,13 +658,53 @@ function updateSectionPos(si) {
 }
 
 // ---------------------------------------------------------------------------
-// Section list (below chart) + audio preview
+// Section list (below chart) + audio preview + playhead
 // ---------------------------------------------------------------------------
 let _previewAudio = null;
+let _playheadEl = null;
+let _rafId = null;
+
 function getAudio() {
-  if (!_previewAudio) { _previewAudio = new Audio(); }
+  if (!_previewAudio) {
+    _previewAudio = new Audio();
+    _previewAudio.addEventListener("play",  refreshPlayBtns);
+    _previewAudio.addEventListener("pause", refreshPlayBtns);
+    _previewAudio.addEventListener("ended", refreshPlayBtns);
+  }
   return _previewAudio;
 }
+
+function refreshPlayBtns() {
+  const audio = getAudio();
+  document.querySelectorAll(".sec-play-btn").forEach(btn => {
+    const si = +btn.dataset.si;
+    const sec = state.sections[si];
+    if (!sec) return;
+    const inSection = !audio.paused &&
+      audio.currentTime >= sec.startSec && audio.currentTime <= sec.endSec;
+    btn.textContent = inSection ? "⏸" : "▶";
+  });
+  if (audio.paused) {
+    el("secPlayheadTime").textContent = state.analyzedPath ? fmtSec(audio.currentTime) : "";
+  }
+}
+
+function animatePlayhead() {
+  const audio = getAudio();
+  if (_playheadEl && _secSvg && state.secTotalSec > 0) {
+    if (!audio.paused) {
+      const x = secX(audio.currentTime).toFixed(1);
+      _playheadEl.setAttribute("x1", x); _playheadEl.setAttribute("x2", x);
+      _playheadEl.setAttribute("visibility", "visible");
+      el("secPlayheadTime").textContent = fmtSec(audio.currentTime);
+      refreshPlayBtns();
+    } else {
+      _playheadEl.setAttribute("visibility", "hidden");
+    }
+  }
+  _rafId = requestAnimationFrame(animatePlayhead);
+}
+
 function playfrom(sec) {
   if (!state.analyzedPath) return;
   const audio = getAudio();
@@ -656,10 +713,15 @@ function playfrom(sec) {
     audio.src = src;
     audio.setAttribute("data-src", src);
   }
+  // Toggle pause if already playing near this position (within 2s).
+  if (!audio.paused && Math.abs(audio.currentTime - sec) < 2) {
+    audio.pause();
+    return;
+  }
   audio.currentTime = sec;
   audio.play();
-  el("secPlayheadTime").textContent = "Playing from " + fmtSec(sec);
   el("secPlayRow").classList.remove("hidden");
+  if (!_rafId) animatePlayhead();
 }
 
 function buildSectionsList() {
@@ -697,7 +759,17 @@ function buildSectionsList() {
     });
   });
   list.querySelectorAll(".sec-play-btn").forEach(btn => {
-    btn.addEventListener("click", () => playfrom(state.sections[+btn.dataset.si].startSec));
+    btn.addEventListener("click", () => {
+      const si = +btn.dataset.si;
+      const audio = getAudio();
+      const sec = state.sections[si];
+      // If playing inside this section → pause; else play from start.
+      if (!audio.paused && audio.currentTime >= sec.startSec && audio.currentTime <= sec.endSec) {
+        audio.pause();
+      } else {
+        playfrom(sec.startSec);
+      }
+    });
   });
   list.querySelectorAll(".sec-del-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -706,6 +778,7 @@ function buildSectionsList() {
       buildSectionsList();
     });
   });
+  refreshPlayBtns();
 }
 
 // ---------------------------------------------------------------------------
