@@ -97,8 +97,12 @@ function collectSettings() {
     sections: state.sections,
     sectionIntensity: num("sectionIntensity"),
     sectionMasteringEnable: chk("sectionEnable"),
-    eqAnalysisEnabled: state.eqAnalysisEnabled && !!state.analysisTarget,
-    eqAnalysisTarget: state.analysisTarget ? [...state.analysisTarget] : new Array(9).fill(0),
+    eqAnalysisEnabled: state.eqAnalysisEnabled && !!state.analysisTarget && !!state.analysisBands,
+    // Send relative deltas (target - input per band) so the engine doesn't need audio_analyzer's
+    // absolute dBFS calibration to match; differences cancel any constant offset.
+    eqAnalysisTarget: (state.analysisTarget && state.analysisBands)
+      ? state.analysisTarget.map((t, i) => t - (state.analysisBands[i]?.loudness ?? 0))
+      : new Array(9).fill(0),
   };
 }
 
