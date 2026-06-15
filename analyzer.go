@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -226,4 +231,133 @@ func tail(s string, n int) string {
 		return s
 	}
 	return "..." + s[len(s)-n:]
+}
+
+// ---------------------------------------------------------------------------
+// AnalysisResult — lightweight loudness + section data for the frontend
+// ---------------------------------------------------------------------------
+
+// AnalysisResult is returned to the frontend by plAnalyze.
+type AnalysisResult struct {
+	TotalSec       float64          `json:"totalSec"`
+	LoudnessSeries []LoudnessSample `json:"loudnessSeries"`
+	Sections       []SectionBound   `json:"sections"`
+}
+
+// LoudnessSample is one 0.5 s bucket of the loudness timeline.
+type LoudnessSample struct {
+	Sec float64 `json:"sec"`
+	Db  float64 `json:"db"`
+}
+
+// SectionBound is a quiet time span for the frontend to mark.
+type SectionBound struct {
+	StartSec float64 `json:"startSec"`
+	EndSec   float64 `json:"endSec"`
+}
+
+var reEbur128 = regexp.MustCompile(`t:\s*([\d.]+)\s+M:\s*(-?\d[\d.]*|-inf)\s+S:\s*(-?\d[\d.]*|-inf)`)
+var reDuration = regexp.MustCompile(`Duration:\s*(\d+):(\d+):([\d.]+)`)
+
+// AnalyzeAudio measures the loudness curve via ffmpeg's EBU R128 filter and
+// returns a result ready for the frontend. It depends only on ffmpeg, so it
+// works even when the audio_analyzer binary is not present.
+func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
+	cmd := exec.Command(an.Ffmpeg,
+		"-i", audioPath,
+		"-af", "ebur128=framelog=verbose",
+		"-f", "null", "-",
+	)
+	CmdHideWindow(cmd)
+	out, _ := cmd.CombinedOutput()
+	text := string(out)
+
+	totalSec := 0.0
+	if m := reDuration.FindStringSubmatch(text); m != nil {
+		h, _ := strconv.ParseFloat(m[1], 64)
+		mn, _ := strconv.ParseFloat(m[2], 64)
+		s, _ := strconv.ParseFloat(m[3], 64)
+		totalSec = h*3600 + mn*60 + s
+	}
+
+	var frames []LoudnessPoint
+	sc := bufio.NewScanner(strings.NewReader(text))
+	for sc.Scan() {
+		m := reEbur128.FindStringSubmatch(sc.Text())
+		if m == nil {
+			continue
+		}
+		t, _ := strconv.ParseFloat(m[1], 64)
+		mv := parseDB(m[2])
+		sv := parseDB(m[3])
+		v := sv
+		if v <= -69 {
+			v = mv
+		}
+		frames = append(frames, LoudnessPoint{Sec: t, DB: v})
+		if t > totalSec {
+			totalSec = t
+		}
+	}
+
+	series := resampleLoudness(frames, totalSec)
+
+	samples := make([]LoudnessSample, len(series))
+	for i, p := range series {
+		samples[i] = LoudnessSample{Sec: p.Sec, Db: p.DB}
+	}
+
+	detected := detectQuietSections(series, DefaultSectionDetectOptions())
+	bounds := make([]SectionBound, len(detected))
+	for i, s := range detected {
+		bounds[i] = SectionBound{StartSec: s.StartSec, EndSec: s.EndSec}
+	}
+
+	return &AnalysisResult{
+		TotalSec:       totalSec,
+		LoudnessSeries: samples,
+		Sections:       bounds,
+	}, nil
+}
+
+func parseDB(s string) float64 {
+	if s == "-inf" || s == "" {
+		return -70
+	}
+	v, _ := strconv.ParseFloat(s, 64)
+	if v < -70 {
+		return -70
+	}
+	return v
+}
+
+func resampleLoudness(frames []LoudnessPoint, totalSec float64) []LoudnessPoint {
+	if len(frames) == 0 || totalSec <= 0 {
+		return nil
+	}
+	const step = 0.5
+	n := int(math.Ceil(totalSec/step)) + 2
+	sums := make([]float64, n)
+	counts := make([]int, n)
+	for _, f := range frames {
+		idx := int(f.Sec / step)
+		if idx >= n {
+			idx = n - 1
+		}
+		sums[idx] += f.DB
+		counts[idx]++
+	}
+	var out []LoudnessPoint
+	for i := 0; i < n; i++ {
+		t := float64(i) * step
+		if t > totalSec+step {
+			break
+		}
+		db := -70.0
+		if counts[i] > 0 {
+			db = sums[i] / float64(counts[i])
+		}
+		out = append(out, LoudnessPoint{Sec: t, DB: db})
+	}
+	return out
 }

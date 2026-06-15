@@ -62,7 +62,6 @@ func main() {
 	w.SetSize(1040, 840, webview2.HintNone)
 
 	app.emit = func(js string) { w.Dispatch(func() { w.Eval(js) }) }
-	app.analyzer = &Analyzer{ffmpeg: app.ffmpeg}
 	w.Bind("plPickInputFiles", app.pickInputFiles)
 	w.Bind("plPickOutputDir", app.pickOutputDir)
 	w.Bind("plDefaultOutputDir", func() string { return getDefaultOutputDir() })
