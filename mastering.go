@@ -44,6 +44,8 @@ type Mastering struct {
 	EQBandLevels            [9]float64 // mastering5_eq_band_levels: per-band optimizer upper-bound (ceiling) multipliers (1=neutral)
 	EQTransformLevels       [9]float64 // mastering5_eq_transform_levels: per-band post-opt wet_gain strength multipliers (1=neutral)
 	EQTransformSymmetric    bool       // mastering5_eq_transform_symmetric: scale cuts too (else boost-only)
+	EQAnalysisTarget        [9]float64 // eq_analysis_target: user's per-band dBFS targets for post-AM static correction
+	EQAnalysisEnabled       bool       // send --eq_analysis_target to the engine
 	// Section-aware mastering: re-render quiet sections with gentler settings.
 	Sections               []Section
 	SectionIntensity       float64
@@ -131,6 +133,13 @@ func (m Mastering) buildEngineArgs(inputPath, outputPath string, level float64) 
 			if m.EQTransformSymmetric {
 				args = append(args, "--mastering5_eq_transform_symmetric", "true")
 			}
+		}
+		if m.EQAnalysisEnabled {
+			parts := make([]string, 9)
+			for i, v := range m.EQAnalysisTarget {
+				parts[i] = strconv.FormatFloat(v, 'f', 3, 64)
+			}
+			args = append(args, "--eq_analysis_target", strings.Join(parts, ","))
 		}
 	}
 

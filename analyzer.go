@@ -237,11 +237,22 @@ func tail(s string, n int) string {
 // AnalysisResult — lightweight loudness + section data for the frontend
 // ---------------------------------------------------------------------------
 
+// BandSample holds per-band loudness data from audio_analyzer (optional — nil if binary absent).
+type BandSample struct {
+	LowFreq  float64 `json:"lowFreq"`
+	HighFreq float64 `json:"highFreq"`
+	Loudness float64 `json:"loudness"`
+	MidMean  float64 `json:"midMean"`
+	SideMean float64 `json:"sideMean"`
+}
+
 // AnalysisResult is returned to the frontend by plAnalyze.
 type AnalysisResult struct {
 	TotalSec       float64          `json:"totalSec"`
 	LoudnessSeries []LoudnessSample `json:"loudnessSeries"`
 	Sections       []SectionBound   `json:"sections"`
+	Bands          []BandSample     `json:"bands"`         // nil when audio_analyzer is absent
+	GlobalLoudness float64          `json:"globalLoudness"` // integrated LUFS (0 when unavailable)
 }
 
 // LoudnessSample is one 0.5 s bucket of the loudness timeline.
@@ -313,11 +324,27 @@ func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
 		bounds[i] = SectionBound{StartSec: s.StartSec, EndSec: s.EndSec}
 	}
 
-	return &AnalysisResult{
+	result := &AnalysisResult{
 		TotalSec:       totalSec,
 		LoudnessSeries: samples,
 		Sections:       bounds,
-	}, nil
+	}
+
+	// Best-effort: run audio_analyzer for per-band loudness. Gracefully skipped if binary absent.
+	if full, err := an.Analyze(audioPath); err == nil {
+		result.GlobalLoudness = full.Loudness
+		for _, b := range full.Bands {
+			result.Bands = append(result.Bands, BandSample{
+				LowFreq:  b.LowFreq,
+				HighFreq: b.HighFreq,
+				Loudness: b.Loudness,
+				MidMean:  b.MidMean,
+				SideMean: b.SideMean,
+			})
+		}
+	}
+
+	return result, nil
 }
 
 func parseDB(s string) float64 {

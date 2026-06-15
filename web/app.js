@@ -14,6 +14,7 @@ const bridge = {
   defaultOutputDir: HAS_GO ? window.plDefaultOutputDir : async () => "C:\\Users\\you\\Downloads",
   startMastering: HAS_GO ? window.plStartMastering : mockStartMastering,
   analyze: typeof window.plAnalyze === "function" ? window.plAnalyze : mockAnalyze,
+  getReference: typeof window.plGetReference === "function" ? window.plGetReference : mockGetReference,
 };
 
 const state = {
@@ -28,6 +29,10 @@ const state = {
   secTotalSec: 0,
   analyzedPath: "",
   jobs: new Map(),
+  referenceProfile: null,    // RefProfile from plGetReference (9 bands from mastering_reference.json)
+  analysisBands: null,       // BandSample[9] from last plAnalyze (null if audio_analyzer absent)
+  analysisTarget: null,      // [9] float64 dBFS — user's blue curve (null until EQ correction enabled)
+  eqAnalysisEnabled: false,  // whether EQ correction (--eq_analysis_target) will be sent to engine
 };
 
 // Effective target mode for band i (per-band override falls back to the global mode).
@@ -92,6 +97,8 @@ function collectSettings() {
     sections: state.sections,
     sectionIntensity: num("sectionIntensity"),
     sectionMasteringEnable: chk("sectionEnable"),
+    eqAnalysisEnabled: state.eqAnalysisEnabled && !!state.analysisTarget,
+    eqAnalysisTarget: state.analysisTarget ? [...state.analysisTarget] : new Array(9).fill(0),
   };
 }
 
@@ -127,6 +134,11 @@ function afterFilesChanged() {
     nameInput.value = "";
     nameInput.placeholder = state.inputs.length > 1 ? "(auto per file)" : "track_output.wav";
     nameInput.disabled = state.inputs.length > 1;
+  }
+  // Auto-analyze first file when it changes.
+  const first = state.inputs[0];
+  if (first && first !== state.analyzedPath) {
+    startAnalyze(first);
   }
 }
 
@@ -258,11 +270,40 @@ function mockAnalysisData() {
       { startSec: 136, endSec: 162 },
       { startSec: 196, endSec: 210 },
     ],
+    globalLoudness: -10.5,
+    bands: [
+      { lowFreq: 0,     highFreq: 148,   loudness: -24.2, midMean: -20.1, sideMean: -48.0 },
+      { lowFreq: 148,   highFreq: 392,   loudness: -22.8, midMean: -19.5, sideMean: -32.1 },
+      { lowFreq: 392,   highFreq: 795,   loudness: -24.6, midMean: -21.8, sideMean: -33.4 },
+      { lowFreq: 795,   highFreq: 1458,  loudness: -25.3, midMean: -22.9, sideMean: -30.5 },
+      { lowFreq: 1458,  highFreq: 2550,  loudness: -25.8, midMean: -23.4, sideMean: -28.2 },
+      { lowFreq: 2550,  highFreq: 4349,  loudness: -26.9, midMean: -24.6, sideMean: -29.7 },
+      { lowFreq: 4349,  highFreq: 7314,  loudness: -28.4, midMean: -26.2, sideMean: -32.1 },
+      { lowFreq: 7314,  highFreq: 12199, loudness: -30.1, midMean: -28.0, sideMean: -35.3 },
+      { lowFreq: 12199, highFreq: 22050, loudness: -33.5, midMean: -31.4, sideMean: -39.8 },
+    ],
   };
 }
 
 function mockAnalyze() {
   return new Promise(resolve => setTimeout(() => resolve(mockAnalysisData()), 700));
+}
+
+function mockGetReference() {
+  return Promise.resolve({
+    bands: [
+      { lowFreq: 0,     highFreq: 148,   loudness: -21.5, midMean: -17.9, sideMean: -45.0 },
+      { lowFreq: 148,   highFreq: 392,   loudness: -20.9, midMean: -17.7, sideMean: -29.4 },
+      { lowFreq: 392,   highFreq: 795,   loudness: -22.1, midMean: -19.2, sideMean: -31.0 },
+      { lowFreq: 795,   highFreq: 1458,  loudness: -22.8, midMean: -20.1, sideMean: -28.5 },
+      { lowFreq: 1458,  highFreq: 2550,  loudness: -23.2, midMean: -21.0, sideMean: -26.1 },
+      { lowFreq: 2550,  highFreq: 4349,  loudness: -24.1, midMean: -21.9, sideMean: -27.3 },
+      { lowFreq: 4349,  highFreq: 7314,  loudness: -25.6, midMean: -23.4, sideMean: -29.8 },
+      { lowFreq: 7314,  highFreq: 12199, loudness: -27.3, midMean: -25.1, sideMean: -32.4 },
+      { lowFreq: 12199, highFreq: 22050, loudness: -30.1, midMean: -28.2, sideMean: -36.0 },
+    ],
+    loudness: -7.42,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -447,6 +488,165 @@ function setupEQModes() {
     row.appendChild(name);
     row.appendChild(sel);
     wrap.appendChild(row);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Analysis band chart — per-band spectrum (red=input, blue=target draggable)
+// ---------------------------------------------------------------------------
+const AB_W = 320, AB_H = 160;
+const AB_PL = 34, AB_PR = 8, AB_PT = 10, AB_PB = 28;
+const AB_CW = AB_W - AB_PL - AB_PR;
+const AB_CH = AB_H - AB_PT - AB_PB;
+const AB_DB_MIN = -42, AB_DB_MAX = -4;
+
+function abX(i) { return AB_PL + (i / 8) * AB_CW; }
+function abY(db) { return AB_PT + AB_CH * (1 - (db - AB_DB_MIN) / (AB_DB_MAX - AB_DB_MIN)); }
+function abDbFromY(y) {
+  return Math.max(AB_DB_MIN, Math.min(AB_DB_MAX,
+    AB_DB_MIN + (1 - (y - AB_PT) / AB_CH) * (AB_DB_MAX - AB_DB_MIN)));
+}
+
+let _abBlueDots = [], _abBlueLine = null, _abDeltaLabels = [], _abBlueHits = [];
+
+function initAnalysisBandChart() {
+  const container = el("analysisBandChart");
+  container.innerHTML = "";
+  const bands = state.analysisBands;
+  if (!bands || !bands.length) {
+    container.innerHTML = '<p class="muted" style="font-size:12px;margin:16px 0">No per-band data — audio_analyzer not available.</p>';
+    _abBlueDots = []; _abBlueLine = null; _abDeltaLabels = []; _abBlueHits = [];
+    return;
+  }
+
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${AB_W} ${AB_H}`);
+  svg.classList.add("ab-svg");
+
+  // Y axis guide lines
+  [-40, -35, -30, -25, -20, -15, -10, -5].forEach(db => {
+    if (db < AB_DB_MIN || db > AB_DB_MAX) return;
+    const y = abY(db);
+    const ln = document.createElementNS(ns, "line");
+    ln.setAttribute("x1", AB_PL); ln.setAttribute("x2", AB_W - AB_PR);
+    ln.setAttribute("y1", y); ln.setAttribute("y2", y);
+    ln.setAttribute("class", "ab-guide");
+    svg.appendChild(ln);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", AB_PL - 3); t.setAttribute("y", y);
+    t.setAttribute("class", "ab-scale");
+    t.textContent = db;
+    svg.appendChild(t);
+  });
+
+  // Red input polyline
+  const redPts = bands.map((b, i) => ({ x: abX(i), y: abY(b.loudness) }));
+  const redLine = document.createElementNS(ns, "polyline");
+  redLine.setAttribute("points", redPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "));
+  redLine.setAttribute("class", "ab-curve-input");
+  svg.appendChild(redLine);
+
+  redPts.forEach((p, i) => {
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y); dot.setAttribute("r", 4.5);
+    dot.setAttribute("class", "ab-dot-input");
+    svg.appendChild(dot);
+  });
+
+  // Blue target polyline (hidden until EQ enabled)
+  const blueLine = document.createElementNS(ns, "polyline");
+  blueLine.setAttribute("class", "ab-curve-target" + (state.eqAnalysisEnabled ? "" : " hidden"));
+  svg.appendChild(blueLine);
+  _abBlueLine = blueLine;
+  _abBlueDots = [];
+  _abDeltaLabels = [];
+  _abBlueHits = [];
+
+  bands.forEach((_, i) => {
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("r", 5);
+    dot.setAttribute("class", "ab-dot-target" + (state.eqAnalysisEnabled ? "" : " hidden"));
+    svg.appendChild(dot);
+    _abBlueDots.push(dot);
+
+    const delta = document.createElementNS(ns, "text");
+    delta.setAttribute("class", "ab-delta" + (state.eqAnalysisEnabled ? "" : " hidden"));
+    svg.appendChild(delta);
+    _abDeltaLabels.push(delta);
+
+    const hit = document.createElementNS(ns, "circle");
+    hit.setAttribute("r", 14);
+    hit.setAttribute("class", "ab-dot-hit" + (state.eqAnalysisEnabled ? "" : " hidden"));
+    svg.appendChild(hit);
+    _abBlueHits.push(hit);
+
+    let dragging = false;
+    hit.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); dragging = true;
+      hit.setPointerCapture(e.pointerId);
+      dot.classList.add("active");
+    });
+    hit.addEventListener("pointermove", (e) => {
+      if (!dragging || !state.analysisTarget) return;
+      const rect = svg.getBoundingClientRect();
+      const rawY = (e.clientY - rect.top) / rect.height * AB_H;
+      const newDb = Math.round(abDbFromY(rawY) * 10) / 10;
+      if (state.analysisTarget[i] === newDb) return;
+      state.analysisTarget[i] = newDb;
+      updateAnalysisBandChart();
+    });
+    hit.addEventListener("pointerup", () => { dragging = false; dot.classList.remove("active"); });
+    hit.addEventListener("dblclick", () => {
+      if (state.analysisTarget && state.referenceProfile) {
+        state.analysisTarget[i] = state.referenceProfile.bands[i].loudness;
+        updateAnalysisBandChart();
+      }
+    });
+  });
+
+  // Band name labels
+  EQ_BANDS.forEach((label, i) => {
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", abX(i)); t.setAttribute("y", AB_H - 3);
+    t.setAttribute("class", "ab-band-label");
+    t.textContent = label;
+    svg.appendChild(t);
+  });
+
+  container.appendChild(svg);
+  updateAnalysisBandChart();
+}
+
+function updateAnalysisBandChart() {
+  if (!_abBlueLine) return;
+  const target = state.analysisTarget;
+  const bands  = state.analysisBands;
+  const show   = state.eqAnalysisEnabled && !!target;
+
+  const toggleClass = (el, cls, add) => {
+    if (add) el.classList.remove(cls); else el.classList.add(cls);
+  };
+  toggleClass(_abBlueLine, "hidden", show);
+  _abBlueDots.forEach(d => toggleClass(d, "hidden", show));
+  _abDeltaLabels.forEach(d => toggleClass(d, "hidden", show));
+  _abBlueHits.forEach(d => toggleClass(d, "hidden", show));
+
+  if (!show || !target || !bands) return;
+
+  const bluePts = target.map((db, i) => ({ x: abX(i), y: abY(db) }));
+  _abBlueLine.setAttribute("points", bluePts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "));
+
+  bluePts.forEach((p, i) => {
+    _abBlueDots[i].setAttribute("cx", p.x); _abBlueDots[i].setAttribute("cy", p.y);
+    _abBlueHits[i].setAttribute("cx", p.x); _abBlueHits[i].setAttribute("cy", p.y);
+
+    const deltaDb = target[i] - bands[i].loudness;
+    const lbl = _abDeltaLabels[i];
+    lbl.setAttribute("x", p.x);
+    lbl.setAttribute("y", (Math.min(p.y, abY(bands[i].loudness)) - 5).toFixed(1));
+    lbl.textContent = (deltaDb >= 0 ? "+" : "") + deltaDb.toFixed(1);
+    lbl.setAttribute("class", "ab-delta " + (deltaDb >= 0 ? "pos" : "neg"));
   });
 }
 
@@ -788,14 +988,15 @@ function buildSectionsList() {
 // ---------------------------------------------------------------------------
 // Analyze
 // ---------------------------------------------------------------------------
-async function startAnalyze() {
+async function startAnalyze(forcePath) {
   // If no file in the mastering queue, pick one just for analysis.
-  let inputPath = state.inputs[0] || "";
+  let inputPath = forcePath || state.inputs[0] || "";
   if (HAS_GO && !inputPath) {
     const picked = await bridge.pickInputFiles();
     if (!picked || !picked.length) return;
     inputPath = picked[0];
   }
+  if (!inputPath) return;
 
   const btn = el("analyzeBtn");
   btn.disabled = true;
@@ -808,8 +1009,10 @@ async function startAnalyze() {
       state.secTotalSec = result.totalSec
         || (state.loudnessSeries.length ? state.loudnessSeries[state.loudnessSeries.length - 1].sec : 0);
       state.sections = (result.sections || []).map(s => ({ startSec: s.startSec, endSec: s.endSec }));
+      state.analysisBands = (result.bands && result.bands.length) ? result.bands : null;
       buildSectionsChart();
       buildSectionsList();
+      renderAnalysisDrawer(result);
       el("analysisDrawer").classList.remove("hidden");
     }
   } catch (err) {
@@ -820,9 +1023,36 @@ async function startAnalyze() {
   }
 }
 
+function renderAnalysisDrawer(result) {
+  // Global metrics
+  const metricsEl = el("analysisMetrics");
+  if (result.globalLoudness) {
+    metricsEl.innerHTML =
+      `<span>Loudness</span><strong>${result.globalLoudness.toFixed(1)} LUFS</strong>` +
+      `<span>Duration</span><strong>${fmtSec(result.totalSec || 0)}</strong>`;
+    metricsEl.classList.remove("hidden");
+  } else {
+    metricsEl.classList.add("hidden");
+  }
+
+  // Per-band chart (redraws SVG from state.analysisBands)
+  initAnalysisBandChart();
+
+  // Show EQ enable row only when bands available
+  el("analysisEqRow").classList.toggle("hidden", !state.analysisBands);
+}
+
 // ---------------------------------------------------------------------------
 // Wire up
 // ---------------------------------------------------------------------------
+async function initReferenceProfile() {
+  try {
+    state.referenceProfile = await bridge.getReference();
+  } catch (e) {
+    console.warn("plGetReference failed:", e);
+  }
+}
+
 async function init() {
   setupReadouts();
   setupDnd();
@@ -834,7 +1064,7 @@ async function init() {
     if (d) el("outputDir").value = d;
   });
   el("masterBtn").addEventListener("click", startMastering);
-  el("analyzeBtn").addEventListener("click", startAnalyze);
+  el("analyzeBtn").addEventListener("click", () => startAnalyze());
   el("secPlayBtn").addEventListener("click", () => {
     const audio = getAudio();
     if (audio.paused) { audio.play(); } else { audio.pause(); }
@@ -845,8 +1075,16 @@ async function init() {
   });
   el("analysisToggle").addEventListener("click", () => el("analysisDrawer").classList.toggle("hidden"));
   el("analysisClose").addEventListener("click", () => el("analysisDrawer").classList.add("hidden"));
+  el("analysisEqEnable").addEventListener("change", (e) => {
+    state.eqAnalysisEnabled = e.target.checked;
+    if (e.target.checked && !state.analysisTarget && state.referenceProfile) {
+      state.analysisTarget = state.referenceProfile.bands.map(b => b.loudness);
+    }
+    updateAnalysisBandChart();
+  });
 
   el("outputDir").value = (await bridge.defaultOutputDir()) || "";
+  initReferenceProfile();
   afterFilesChanged();
   buildSectionsChart();
 }

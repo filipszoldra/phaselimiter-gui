@@ -226,6 +226,24 @@ details.eq-adv { margin-top: 10px; }
 .job-bar { height: 5px; background: #2b323d; border-radius: 99px; overflow: hidden; margin-top: 9px; }
 .job-bar > div { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); transition: width .25s; }
 
+/* ---------- analysis band chart ---------- */
+.ab-svg { display: block; width: 100%; height: auto; user-select: none; }
+.ab-guide { fill: none; stroke: var(--line-soft); stroke-width: 1; }
+.ab-scale { font-size: 9px; text-anchor: end; dominant-baseline: middle; fill: #4a5260; font-family: var(--font); pointer-events: none; }
+.ab-band-label { font-size: 9px; text-anchor: middle; dominant-baseline: auto; fill: var(--muted); font-family: var(--font); pointer-events: none; }
+.ab-curve-input  { fill: none; stroke: #e05555; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ab-dot-input    { fill: #e05555; pointer-events: none; }
+.ab-curve-target { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ab-dot-target   { fill: var(--accent); stroke: #2a0f20; stroke-width: 2; pointer-events: none; }
+.ab-dot-target.active { fill: var(--accent-soft); }
+.ab-dot-hit      { fill: rgba(0,0,0,0); cursor: ns-resize; }
+.ab-delta        { font-size: 9.5px; text-anchor: middle; dominant-baseline: auto; font-weight: 600; font-family: var(--font); pointer-events: none; }
+.ab-delta.pos    { fill: var(--accent-soft); }
+.ab-delta.neg    { fill: #e05555; }
+.ab-metrics { display: flex; gap: 14px; font-size: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.ab-metrics span { color: var(--muted); }
+.ab-metrics strong { color: var(--text); }
+
 /* ---------- analysis drawer ---------- */
 .analysis-drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 380px; background: var(--bg-2);
   border-left: 1px solid var(--line); padding: 18px; box-shadow: -10px 0 30px rgba(0,0,0,.4); overflow-y: auto; }

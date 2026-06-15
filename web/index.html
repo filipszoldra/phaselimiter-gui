@@ -178,7 +178,17 @@
 
   <aside id="analysisDrawer" class="analysis-drawer hidden">
     <div class="drawer-head"><h2>Track analysis</h2><button id="analysisClose" class="btn ghost small">Close</button></div>
-    <p class="muted">Spectrogram, loudness timeline and graphs (Phase E).</p>
+    <div id="analysisMetrics" class="ab-metrics hidden"></div>
+    <div id="analysisBandChart">
+      <p class="muted" style="font-size:12px;margin:16px 0">Add a file — analysis starts automatically.</p>
+    </div>
+    <div id="analysisEqRow" class="hidden" style="margin-top:10px">
+      <label class="check">
+        <input id="analysisEqEnable" type="checkbox" />
+        <span>Enable EQ correction <em class="muted">(applied between automastering &amp; limiter)</em></span>
+      </label>
+      <p id="analysisEqNote" class="muted" style="font-size:11px;margin:6px 0 0 25px">Blue = your target (drag per band). Red = your track. Applied as static gain after automastering.</p>
+    </div>
   </aside>
 
   <script src="app.js"></script>
