@@ -135,9 +135,9 @@ function afterFilesChanged() {
     nameInput.placeholder = state.inputs.length > 1 ? "(auto per file)" : "track_output.wav";
     nameInput.disabled = state.inputs.length > 1;
   }
-  // Auto-analyze first file when it changes.
+  // Auto-analyze first file when it changes (skip if already in flight).
   const first = state.inputs[0];
-  if (first && first !== state.analyzedPath) {
+  if (first && first !== state.analyzedPath && !state._analyzeInFlight) {
     startAnalyze(first);
   }
 }
@@ -598,7 +598,7 @@ function initAnalysisBandChart() {
     });
     hit.addEventListener("pointerup", () => { dragging = false; dot.classList.remove("active"); });
     hit.addEventListener("dblclick", () => {
-      if (state.analysisTarget && state.referenceProfile) {
+      if (state.analysisTarget && state.referenceProfile?.bands?.[i]) {
         state.analysisTarget[i] = state.referenceProfile.bands[i].loudness;
         updateAnalysisBandChart();
       }
@@ -624,8 +624,8 @@ function updateAnalysisBandChart() {
   const bands  = state.analysisBands;
   const show   = state.eqAnalysisEnabled && !!target;
 
-  const toggleClass = (el, cls, add) => {
-    if (add) el.classList.remove(cls); else el.classList.add(cls);
+  const toggleClass = (el, cls, show) => {
+    if (show) el.classList.remove(cls); else el.classList.add(cls);
   };
   toggleClass(_abBlueLine, "hidden", show);
   _abBlueDots.forEach(d => toggleClass(d, "hidden", show));
@@ -998,6 +998,7 @@ async function startAnalyze(forcePath) {
   }
   if (!inputPath) return;
 
+  state._analyzeInFlight = true;
   const btn = el("analyzeBtn");
   btn.disabled = true;
   btn.textContent = "Analyzing…";
@@ -1018,6 +1019,7 @@ async function startAnalyze(forcePath) {
   } catch (err) {
     alert("Analyze failed: " + err);
   } finally {
+    state._analyzeInFlight = false;
     btn.disabled = false;
     btn.textContent = "Analyze";
   }
