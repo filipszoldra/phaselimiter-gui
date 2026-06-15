@@ -647,6 +647,7 @@ async function startAnalyze() {
   btn.textContent = "Analyzing…";
   try {
     const result = await bridge.analyze(inputPath);
+    console.log("analyze result:", JSON.stringify(result).slice(0, 500));
     if (result) {
       state.loudnessSeries = result.loudnessSeries || [];
       state.secTotalSec = result.totalSec
