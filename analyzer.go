@@ -256,7 +256,7 @@ type SectionBound struct {
 	EndSec   float64 `json:"endSec"`
 }
 
-var reEbur128 = regexp.MustCompile(`t:\s*([\d.]+)\s+M:\s*(-?\d[\d.]*|-inf)\s+S:\s*(-?\d[\d.]*|-inf)`)
+var reEbur128 = regexp.MustCompile(`t:\s*([\d.]+).*?M:\s*(-?[\d.]+|-inf).*?S:\s*(-?[\d.]+|-inf)`)
 var reDuration = regexp.MustCompile(`Duration:\s*(\d+):(\d+):([\d.]+)`)
 
 // AnalyzeAudio measures the loudness curve via ffmpeg's EBU R128 filter and
@@ -265,7 +265,7 @@ var reDuration = regexp.MustCompile(`Duration:\s*(\d+):(\d+):([\d.]+)`)
 func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
 	cmd := exec.Command(an.Ffmpeg,
 		"-i", audioPath,
-		"-af", "ebur128=framelog=verbose",
+		"-af", "ebur128=framelog=info",
 		"-f", "null", "-",
 	)
 	CmdHideWindow(cmd)
