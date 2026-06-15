@@ -629,9 +629,11 @@ function buildSectionsChart() {
   svg.appendChild(phLine);
   _playheadEl = phLine;
 
-  // Click on chart → seek (ignore hits on drag handles)
+  // Click on chart: if playing → pause; if paused → seek + play
   svg.addEventListener("click", (e) => {
     if (e.target.classList.contains("sec-hit")) return;
+    const audio = getAudio();
+    if (!audio.paused) { audio.pause(); return; }
     const rect = svg.getBoundingClientRect();
     const sec = secSecFromX((e.clientX - rect.left) / rect.width * SEC_W);
     playfrom(sec);
