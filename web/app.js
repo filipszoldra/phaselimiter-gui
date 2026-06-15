@@ -13,6 +13,7 @@ const bridge = {
   pickOutputDir: HAS_GO ? window.plPickOutputDir : async () => "C:\\Users\\you\\Downloads",
   defaultOutputDir: HAS_GO ? window.plDefaultOutputDir : async () => "C:\\Users\\you\\Downloads",
   startMastering: HAS_GO ? window.plStartMastering : mockStartMastering,
+  analyze: HAS_GO ? window.plAnalyze : mockAnalyze,
 };
 
 const state = {
@@ -20,6 +21,8 @@ const state = {
   outputDir: "",
   eqBands: [1, 1, 1, 1, 1, 1, 1, 1, 1],
   sections: [],
+  loudnessSeries: [],
+  secTotalSec: 0,
   jobs: new Map(),
 };
 
@@ -207,6 +210,40 @@ function mockStartMastering(req) {
 }
 
 // ---------------------------------------------------------------------------
+// Mock analysis (browser / Playwright only)
+// ---------------------------------------------------------------------------
+function mockAnalysisData() {
+  const totalSec = 210;
+  const series = [];
+  for (let t = 0; t <= totalSec; t += 0.5) {
+    let db;
+    if (t < 18)       db = -36 + (t / 18) * 14;
+    else if (t < 48)  db = -18 + Math.sin((t - 18) * 0.4) * 3;
+    else if (t < 78)  db = -12 + Math.sin((t - 48) * 0.3) * 2;
+    else if (t < 108) db = -17 + Math.sin((t - 78)  * 0.4) * 2.5;
+    else if (t < 138) db = -11 + Math.sin((t - 108) * 0.3) * 2;
+    else if (t < 163) db = -22 + Math.sin((t - 138) * 0.5) * 4;
+    else if (t < 195) db = -10 + Math.sin((t - 163) * 0.25) * 2;
+    else              db = -12 - ((t - 195) / 15) * 24;
+    db += (Math.random() - 0.5) * 1.5;
+    series.push({ sec: t, db: Math.max(-46, Math.min(-6, db)) });
+  }
+  return {
+    totalSec,
+    loudnessSeries: series,
+    sections: [
+      { startSec: 0,   endSec: 17  },
+      { startSec: 136, endSec: 162 },
+      { startSec: 196, endSec: 210 },
+    ],
+  };
+}
+
+function mockAnalyze() {
+  return new Promise(resolve => setTimeout(() => resolve(mockAnalysisData()), 700));
+}
+
+// ---------------------------------------------------------------------------
 // Drag & drop (WebView2 may not expose real paths; picker is the primary path)
 // ---------------------------------------------------------------------------
 function setupDnd() {
@@ -365,6 +402,210 @@ function updateEQ() {
 }
 
 // ---------------------------------------------------------------------------
+// Sections chart (Phase D) — loudness-by-time + draggable section boundaries
+// ---------------------------------------------------------------------------
+const SEC_W = 540, SEC_H = 110;
+const SEC_PL = 32, SEC_PR = 8, SEC_PT = 12, SEC_PB = 22;
+const SEC_CW = SEC_W - SEC_PL - SEC_PR;   // 500
+const SEC_CH = SEC_H - SEC_PT - SEC_PB;   // 76
+const SEC_DB_MIN = -42, SEC_DB_MAX = -6;
+
+function secX(sec) { return SEC_PL + (sec / (state.secTotalSec || 1)) * SEC_CW; }
+function secY(db)  { return SEC_PT + SEC_CH * (1 - (db - SEC_DB_MIN) / (SEC_DB_MAX - SEC_DB_MIN)); }
+function secSecFromX(x) {
+  const tot = state.secTotalSec || 1;
+  return Math.max(0, Math.min(tot, (x - SEC_PL) / SEC_CW * tot));
+}
+
+let _secSvg = null;
+let _secHandleEls = [];
+
+function buildSectionsChart() {
+  const ns = "http://www.w3.org/2000/svg";
+  const container = el("sectionsChart");
+  container.innerHTML = "";
+  _secHandleEls = [];
+
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${SEC_W} ${SEC_H}`);
+  svg.classList.add("sec-svg");
+  _secSvg = svg;
+
+  if (!state.loudnessSeries.length) {
+    const pBg = document.createElementNS(ns, "rect");
+    pBg.setAttribute("x", "1"); pBg.setAttribute("y", "1");
+    pBg.setAttribute("width", SEC_W - 2); pBg.setAttribute("height", SEC_H - 2);
+    pBg.setAttribute("rx", "6"); pBg.setAttribute("class", "sec-placeholder-bg");
+    svg.appendChild(pBg);
+    const msg = document.createElementNS(ns, "text");
+    msg.setAttribute("x", SEC_W / 2); msg.setAttribute("y", SEC_H / 2);
+    msg.setAttribute("class", "sec-empty");
+    msg.textContent = "Run Analyze to see loudness timeline & auto-detected sections";
+    svg.appendChild(msg);
+    container.appendChild(svg);
+    return;
+  }
+
+  // Background
+  const bg = document.createElementNS(ns, "rect");
+  bg.setAttribute("x", "0"); bg.setAttribute("y", "0");
+  bg.setAttribute("width", SEC_W); bg.setAttribute("height", SEC_H);
+  bg.setAttribute("rx", "6"); bg.setAttribute("class", "sec-bg");
+  svg.appendChild(bg);
+
+  // Horizontal guides at -10, -20, -30, -40 LUFS
+  [-10, -20, -30, -40].forEach(db => {
+    const y = secY(db);
+    if (y < SEC_PT - 2 || y > SEC_PT + SEC_CH + 2) return;
+    const ln = document.createElementNS(ns, "line");
+    ln.setAttribute("x1", SEC_PL); ln.setAttribute("x2", SEC_W - SEC_PR);
+    ln.setAttribute("y1", y.toFixed(1)); ln.setAttribute("y2", y.toFixed(1));
+    ln.setAttribute("class", "sec-guide");
+    svg.appendChild(ln);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", SEC_PL - 4); t.setAttribute("y", y.toFixed(1));
+    t.setAttribute("class", "sec-guide-label");
+    t.textContent = String(db);
+    svg.appendChild(t);
+  });
+
+  // Time labels
+  const total = state.secTotalSec;
+  const step = total > 180 ? 60 : total > 90 ? 30 : 15;
+  for (let s = 0; s <= total; s += step) {
+    const x = secX(s);
+    const min = Math.floor(s / 60), srem = s % 60;
+    const label = srem === 0 ? `${min}m` : `${min}:${String(srem).padStart(2, "0")}`;
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", x.toFixed(1)); t.setAttribute("y", (SEC_H - 4).toFixed(1));
+    t.setAttribute("class", "sec-time-label");
+    t.textContent = label;
+    svg.appendChild(t);
+  }
+
+  // Loudness curve
+  let d = "";
+  state.loudnessSeries.forEach((pt, i) => {
+    const x = secX(pt.sec).toFixed(1), y = secY(pt.db).toFixed(1);
+    d += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
+  });
+  const curve = document.createElementNS(ns, "path");
+  curve.setAttribute("d", d); curve.setAttribute("class", "sec-curve");
+  svg.appendChild(curve);
+
+  // Section shade areas (below handles in z-order)
+  const shadeEls = state.sections.map(sec => {
+    const x1 = secX(sec.startSec), x2 = secX(sec.endSec);
+    const shade = document.createElementNS(ns, "rect");
+    shade.setAttribute("x", x1.toFixed(1)); shade.setAttribute("y", String(SEC_PT));
+    shade.setAttribute("width", (x2 - x1).toFixed(1)); shade.setAttribute("height", String(SEC_CH));
+    shade.setAttribute("class", "sec-shade");
+    svg.appendChild(shade);
+    return shade;
+  });
+
+  // Section handles (rendered after shades = on top)
+  state.sections.forEach((sec, si) => {
+    const groupEls = { shade: shadeEls[si] };
+
+    ["start", "end"].forEach((which) => {
+      const xPos = secX(which === "start" ? sec.startSec : sec.endSec);
+
+      const line = document.createElementNS(ns, "line");
+      line.setAttribute("x1", xPos.toFixed(1)); line.setAttribute("x2", xPos.toFixed(1));
+      line.setAttribute("y1", String(SEC_PT)); line.setAttribute("y2", String(SEC_PT + SEC_CH));
+      line.setAttribute("class", "sec-line");
+      svg.appendChild(line);
+
+      const dot = document.createElementNS(ns, "circle");
+      dot.setAttribute("cx", xPos.toFixed(1)); dot.setAttribute("cy", String(SEC_PT + 8));
+      dot.setAttribute("r", "7"); dot.setAttribute("class", "sec-handle");
+      svg.appendChild(dot);
+
+      // Invisible wide hit rect (18px, full height) — on top for events
+      const hit = document.createElementNS(ns, "rect");
+      hit.setAttribute("x", (xPos - 9).toFixed(1)); hit.setAttribute("y", String(SEC_PT));
+      hit.setAttribute("width", "18"); hit.setAttribute("height", String(SEC_CH));
+      hit.setAttribute("class", "sec-hit");
+      svg.appendChild(hit);
+
+      groupEls[which] = { line, dot, hit };
+
+      let dragging = false;
+      hit.addEventListener("pointerdown", (e) => {
+        e.preventDefault(); dragging = true;
+        hit.setPointerCapture(e.pointerId);
+        dot.classList.add("active");
+      });
+      hit.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const rect = svg.getBoundingClientRect();
+        const rawX = (e.clientX - rect.left) / rect.width * SEC_W;
+        let newSec = secSecFromX(rawX);
+        if (which === "start") {
+          state.sections[si].startSec = Math.round(Math.min(state.sections[si].endSec - 1, newSec) * 10) / 10;
+        } else {
+          state.sections[si].endSec = Math.round(Math.max(state.sections[si].startSec + 1, Math.min(state.secTotalSec, newSec)) * 10) / 10;
+        }
+        updateSectionPos(si);
+      });
+      hit.addEventListener("pointerup", () => { dragging = false; dot.classList.remove("active"); });
+      hit.addEventListener("pointerenter", () => { if (!dragging) dot.classList.add("active"); });
+      hit.addEventListener("pointerleave", () => { if (!dragging) dot.classList.remove("active"); });
+      hit.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        state.sections.splice(si, 1);
+        buildSectionsChart();
+      });
+    });
+
+    _secHandleEls.push(groupEls);
+  });
+
+  container.appendChild(svg);
+}
+
+function updateSectionPos(si) {
+  const sec = state.sections[si];
+  const els = _secHandleEls[si];
+  const x1 = secX(sec.startSec), x2 = secX(sec.endSec);
+
+  els.shade.setAttribute("x", x1.toFixed(1));
+  els.shade.setAttribute("width", (x2 - x1).toFixed(1));
+
+  ["start", "end"].forEach((which) => {
+    const x = which === "start" ? x1 : x2;
+    const { line, dot, hit } = els[which];
+    line.setAttribute("x1", x.toFixed(1)); line.setAttribute("x2", x.toFixed(1));
+    dot.setAttribute("cx", x.toFixed(1));
+    hit.setAttribute("x", (x - 9).toFixed(1));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Analyze
+// ---------------------------------------------------------------------------
+async function startAnalyze() {
+  if (HAS_GO && !state.inputs.length) { flash(el("analyzeBtn")); return; }
+  const btn = el("analyzeBtn");
+  btn.disabled = true;
+  btn.textContent = "Analyzing…";
+  try {
+    const result = await bridge.analyze(state.inputs[0] || "");
+    if (result) {
+      state.loudnessSeries = result.loudnessSeries || [];
+      state.secTotalSec = result.totalSec
+        || (state.loudnessSeries.length ? state.loudnessSeries[state.loudnessSeries.length - 1].sec : 0);
+      state.sections = (result.sections || []).map(s => ({ startSec: s.startSec, endSec: s.endSec }));
+      buildSectionsChart();
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Analyze";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Wire up
 // ---------------------------------------------------------------------------
 async function init() {
@@ -377,6 +618,7 @@ async function init() {
     if (d) el("outputDir").value = d;
   });
   el("masterBtn").addEventListener("click", startMastering);
+  el("analyzeBtn").addEventListener("click", startAnalyze);
   el("eqReset").addEventListener("click", () => {
     state.eqBands = state.eqBands.map(() => 1);
     updateEQ();
@@ -386,6 +628,7 @@ async function init() {
 
   el("outputDir").value = (await bridge.defaultOutputDir()) || "";
   afterFilesChanged();
+  buildSectionsChart();
 }
 
 document.addEventListener("DOMContentLoaded", init);

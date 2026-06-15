@@ -175,12 +175,21 @@ details.diag summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 .eq-scale { font-size: 9px; text-anchor: start; dominant-baseline: middle; fill: #4a5260;
   font-family: var(--font); pointer-events: none; }
 
-/* ---------- sections placeholder (Phase D) ---------- */
-.sections-placeholder {
-  border: 1px dashed var(--line); border-radius: var(--radius-sm); color: #6c7480;
-  display: grid; place-items: center; text-align: center; font-size: 12px; padding: 10px;
-  height: 96px; margin: 12px 0;
-}
+/* ---------- sections chart (Phase D) ---------- */
+#sectionsChart { margin: 12px 0; }
+.sec-svg { display: block; width: 100%; height: auto; user-select: none; }
+.sec-bg { fill: var(--bg-2); }
+.sec-placeholder-bg { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 5 4; }
+.sec-guide { fill: none; stroke: var(--line-soft); stroke-width: 1; }
+.sec-guide-label { font-size: 9px; text-anchor: end; dominant-baseline: middle; fill: #4a5260; font-family: var(--font); pointer-events: none; }
+.sec-time-label { font-size: 9px; text-anchor: middle; dominant-baseline: auto; fill: #4a5260; font-family: var(--font); pointer-events: none; }
+.sec-curve { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: 0.8; }
+.sec-shade { fill: var(--accent); opacity: 0.18; pointer-events: none; }
+.sec-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.sec-handle { fill: var(--accent); stroke: #2a0f20; stroke-width: 2; pointer-events: none; }
+.sec-handle.active { fill: var(--accent-soft); }
+.sec-hit { fill: rgba(0,0,0,0); cursor: ew-resize; }
+.sec-empty { font-size: 11px; text-anchor: middle; dominant-baseline: middle; fill: #4a5260; font-family: var(--font); }
 
 /* ---------- jobs ---------- */
 .job-list { display: flex; flex-direction: column; gap: 9px; }
