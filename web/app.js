@@ -13,7 +13,7 @@ const bridge = {
   pickOutputDir: HAS_GO ? window.plPickOutputDir : async () => "C:\\Users\\you\\Downloads",
   defaultOutputDir: HAS_GO ? window.plDefaultOutputDir : async () => "C:\\Users\\you\\Downloads",
   startMastering: HAS_GO ? window.plStartMastering : mockStartMastering,
-  analyze: HAS_GO ? window.plAnalyze : mockAnalyze,
+  analyze: typeof window.plAnalyze === "function" ? window.plAnalyze : mockAnalyze,
 };
 
 const state = {

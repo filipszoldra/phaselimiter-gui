@@ -76,6 +76,9 @@ type StartReq struct {
 
 func (app *App) pickInputFiles() ([]string, error) { return selectAudioFiles() }
 func (app *App) pickOutputDir() (string, error)    { return selectDirectory() }
+func (app *App) analyze(input string) (*AnalysisResult, error) {
+	return app.analyzer.Analyze(input)
+}
 
 // startMastering builds one Mastering job per input, enqueues them, and returns
 // the initial rows so the frontend can render the queue immediately.

@@ -273,6 +273,187 @@
     zachowanie jest identyczne jak przed tą funkcją.</div>
   </section>
 
+  <!-- ============ ŁAŃCUCH PRZETWARZANIA ============ -->
+  <section>
+    <h2>Łańcuch przetwarzania — co się dzieje z dźwiękiem krok po kroku</h2>
+    <p class="meta">Każdy plik przechodzi przez te same etapy, w tej kolejności.
+    Rozumienie kolejności pomaga trafnie ustawić kontrolki.</p>
+
+    <div class="note">
+      <b>Etap pośredni do testów.</b> Silnik posiada flagi diagnostyczne:
+      <code>--output_after_automastering</code>, <code>--output_after_pre_compression</code>
+      i <code>--output_after_phase_limiter</code> — pozwalają zapisać plik po każdym etapie
+      i usłyszeć, co dokładnie robi każdy krok.
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Etap</th>
+          <th>Co robi</th>
+          <th>Kontrolka w GUI</th>
+          <th>Artefakt gdy zbyt mocny</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0</td>
+          <td><b>Dekodowanie</b><br><span class="meta">ffmpeg → float32 PCM</span></td>
+          <td>Konwertuje dowolny format audio (MP3, FLAC, WAV…) do roboczego bufora
+              float32, 44 100 Hz, stereo.</td>
+          <td>—</td>
+          <td>brak</td>
+        </tr>
+        <tr>
+          <td>1</td>
+          <td><b>Low / high cut</b><br><span class="meta">CutLowAndHighFreq</span></td>
+          <td>Filtr FIR o liniowej fazie: ucina rumble poniżej 20 Hz i ultradźwięki powyżej
+              20 000 Hz. Chroni limiter przed marnowaniem headroomu na treść niesłyszalną.</td>
+          <td>—<br><span class="meta">(flagi silnika <code>--low_cut_freq</code> /
+              <code>--high_cut_freq</code>, domyślnie 20 Hz / 20 kHz)</span></td>
+          <td>brak przy domyślnych wartościach</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><b>Normalizacja wewnętrzna</b><br><span class="meta">Normalize (L-∞)</span></td>
+          <td>Skaluje bufor tak, żeby szczyt wynosił dokładnie ±1,0.
+              Czysto techniczne — wyrównuje poziom wejściowy dla kolejnego etapu.</td>
+          <td>—</td>
+          <td>brak (odwracalne)</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><b>AutoMastering5</b><br><span class="meta">DE-PRMM / PSO</span></td>
+          <td>Główny etap barwy i dynamiki. Algorytm ewolucyjny (różnicowa ewolucja + PSO)
+              szuka 72 parametrów kompresora M/S per pasmo, które maksymalizują wyuczony
+              wskaźnik SoundQuality2 — czyli dopasowują brzmienie do wzorca
+              <code>mastering_reference.json</code>.
+              <br><br>
+              Po optymalizacji opcjonalnie skaluje realny <em>wet-gain</em> per pasmo
+              (<code>--mastering5_eq_transform_levels</code>, <code>r = 1 + 0.5·(level−1)</code>).
+          </td>
+          <td>
+            <b>Intensywność</b> — jak mocno przekształca<br>
+            <b>Siła dopasowania stereo</b> — siła zmiany pola stereo<br>
+            <b>Krzywa EQ</b> (tryb Ceiling) — miękki sufit wet-gain per pasmo<br>
+            <b>Krzywa EQ</b> (tryb Transform) — deterministyczna siła transformacji per pasmo
+          </td>
+          <td><span class="pill crunch">deformacja kopnięcia</span>
+              <span class="pill smear">poszerzenie hihatów</span>
+              <span class="pill pump">niespodziewane wzmocnienie cichych pasm</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><b>Low / high cut + normalizacja</b></td>
+          <td>Drugie czyszczenie — usuwa artefakty krawędziowe wprowadzone przez AutoMastering5.</td>
+          <td>—</td>
+          <td>brak</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><b>Pre-kompresja</b><br><span class="meta">PreCompress</span></td>
+          <td>Kompresor RMS w dziedzinie czasu, działający <b>przed</b> limiterem.
+              Redukuje najgłośniejsze szczyty zanim wejdą do limitera — zmniejsza pracę
+              limitera i artefakty przy głośnych transjentach.
+              <br><br>Okno uśredniania (<code>--pre_compression_mean_sec</code>) określa,
+              jak szybko kompresor reaguje: krótkie = pompowanie; dłuższe = płynniej.</td>
+          <td>
+            <b>Pre-kompresja</b> (włącz/wyłącz)<br>
+            <b>Próg</b> (+dB ponad głośność toru)<br>
+            <b>Okno</b> (s — czas uśredniania RMS)
+          </td>
+          <td><span class="pill pump">pompowanie / oddychanie</span>
+              <span class="pill smear">utrata dynamiki</span></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><b>Obliczenie wzmocnienia</b><br><span class="meta">EBU R128</span></td>
+          <td>Mierzy zintegrowaną głośność (LUFS) całego bufora, oblicza wzmocnienie
+              liniowe potrzebne do osiągnięcia docelowego poziomu.
+              Nie zmienia jeszcze dźwięku.</td>
+          <td><b>Docelowa głośność</b> (LUFS)<br>
+              <span class="meta">Niższy target = mniej wzmocnienia wpychanego w limiter</span></td>
+          <td>brak (tylko obliczenie)</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><b>Zastosowanie wzmocnienia</b></td>
+          <td>Mnoży bufor przez obliczony współczynnik.
+              Próbki przekraczające ±1,0 po przemnożeniu włączają tryb limitowania.</td>
+          <td>—</td>
+          <td>brak sam w sobie; nadmierny gain → więcej pracy dla limitera</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><b>Limiter fazowy</b><br><span class="meta">PhaseLimitInplace (FISTA)</span></td>
+          <td>Iteracyjny optymalizator FFT minimalizuje słyszalny błąd limitowania:
+              zamiast obcinać szczyty w dziedzinie czasu, rozkłada nadwyżkę energii
+              na sąsiednie próbki/częstotliwości w sposób percepcyjnie optymalny.
+              Zmniejsza trzaski, chrupanie i inter-modulację w porównaniu do zwykłego
+              clippera.<br><br>
+              Liczba iteracji (<code>--max_iter1</code>) decyduje o jakości:
+              mniej = szybciej ale słyszalne zniekształcenia; więcej = czystszy wynik.</td>
+          <td>
+            <b>Jakość (iteracje)</b> — liczba kroków optymalizatora<br>
+            <b>Nadpróbkowanie</b> — 2× / 4× redukuje aliasing<br>
+            <b>Zachowaj bas</b> — ważenie percepcyjne ERB
+          </td>
+          <td><span class="pill crunch">chrupanie / szorstkie szczyty</span>
+              <span class="pill smear">pre-ringing / rozmycie transjentów</span></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><b>Egzekwowanie sufitu true-peak</b><br><span class="meta">CalculateCeilingPeak</span></td>
+          <td>Sprawdza true-peak (4× oversample domyślnie) i ewentualnie cofnięcie o ułamek dB.
+              Gwarantuje, że plik nie przekroczy zadeklarowanego sufitu po konwersji/kodowaniu.</td>
+          <td><b>Sufit true-peak</b> (dB, domyślnie −1,0)</td>
+          <td><span class="pill clicks">trzaski po konwersji do lossy (MP3/AAC)</span></td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td><b>Kodowanie wyjścia</b><br><span class="meta">ffmpeg</span></td>
+          <td>Zapisuje bufor float32 jako WAV 16/24 bit lub ponownie koduje do MP3/AAC.
+              Przy formatach lossy wcześniej (przed pre-kompresją) wykonywane jest
+              wstępne kodowanie, żeby usunąć harmoniczne powyżej Nyquista i zapobiec
+              overshotom po finalnym kodowaniu.</td>
+          <td>—</td>
+          <td>brak przy WAV; przy MP3/AAC — możliwy true-peak overshoot</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Krzywa EQ — dwa tryby działania</h3>
+    <p>Ta sama krzywa 9 suwakowa działa inaczej w zależności od wybranego trybu:</p>
+    <table>
+      <thead><tr><th>Tryb</th><th>Co robi</th><th>Kiedy używać</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Ceiling + transform</b> (domyślnie)</td>
+          <td>Skaluje zarówno sufit, jak i siłę transformacji per pasmo
+              (<code>r = 1 + 0.5·(level−1)</code>)</td>
+          <td>Ogólna kontrola nad kształtowaniem barwy</td>
+        </tr>
+        <tr>
+          <td><b>Ceiling only</b></td>
+          <td>Tylko miękki górny limit optymalizatora — zmniejsza worst-case pumping
+              w ogonie P95, ale efekt jest stochastyczny (zależny od intensywności)</td>
+          <td>Tłumienie ekstremalnych wartości przy dużej intensywności</td>
+        </tr>
+        <tr>
+          <td><b>Transform only</b></td>
+          <td>Deterministyczne skalowanie zrealizowanego wet-gain po optymalizacji —
+              zawsze rusza pasmo niezależnie od intensywności</td>
+          <td>Precyzyjna korekta barwy, powtarzalna przy każdym renderze</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note"><b>Paradoks cięcia.</b> Przy domyślnym trybie <b>boost-only</b>
+    obniżenie suwaka pasma, które silnik tnie (wet-gain ujemny), nie zmienia nic —
+    bo mnożnik działa tylko na boosty. Włącz <em>Symmetric transform</em> w Zaawansowanych,
+    jeśli chcesz świadomie kontrolować siłę cięcia.</div>
+  </section>
+
   <!-- ============ TABELA OBJAW -> LEK ============ -->
   <section>
     <h2>Objaw → lekarstwo <span class="tag adv">Ściąga</span></h2>
