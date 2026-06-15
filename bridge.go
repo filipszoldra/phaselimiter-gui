@@ -77,7 +77,14 @@ type StartReq struct {
 func (app *App) pickInputFiles() ([]string, error) { return selectAudioFiles() }
 func (app *App) pickOutputDir() (string, error)    { return selectDirectory() }
 func (app *App) analyze(input string) (*AnalysisResult, error) {
-	return app.analyzer.AnalyzeAudio(input)
+	log.Printf("analyze: input=%q ffmpeg=%q", input, app.analyzer.Ffmpeg)
+	result, err := app.analyzer.AnalyzeAudio(input)
+	if err != nil {
+		log.Printf("analyze error: %v", err)
+	} else {
+		log.Printf("analyze ok: %.0fs, %d samples, %d sections", result.TotalSec, len(result.LoudnessSeries), len(result.Sections))
+	}
+	return result, err
 }
 
 // startMastering builds one Mastering job per input, enqueues them, and returns
