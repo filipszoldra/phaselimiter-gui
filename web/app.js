@@ -26,6 +26,7 @@ const state = {
   sections: [],
   loudnessSeries: [],
   secTotalSec: 0,
+  analyzedPath: "",
   jobs: new Map(),
 };
 
@@ -458,6 +459,15 @@ const SEC_CW = SEC_W - SEC_PL - SEC_PR;   // 500
 const SEC_CH = SEC_H - SEC_PT - SEC_PB;   // 76
 const SEC_DB_MIN = -42, SEC_DB_MAX = -6;
 
+function fmtSec(s) {
+  const m = Math.floor(s / 60), sec = (s % 60).toFixed(1);
+  return `${m}:${sec.padStart(4, "0")}`;
+}
+function parseSec(str) {
+  const p = (str || "0").trim().split(":");
+  return p.length === 2 ? parseFloat(p[0]) * 60 + parseFloat(p[1]) : parseFloat(p[0]) || 0;
+}
+
 function secX(sec) { return SEC_PL + (sec / (state.secTotalSec || 1)) * SEC_CW; }
 function secY(db)  { return SEC_PT + SEC_CH * (1 - (db - SEC_DB_MIN) / (SEC_DB_MAX - SEC_DB_MIN)); }
 function secSecFromX(x) {
@@ -597,7 +607,7 @@ function buildSectionsChart() {
         }
         updateSectionPos(si);
       });
-      hit.addEventListener("pointerup", () => { dragging = false; dot.classList.remove("active"); });
+      hit.addEventListener("pointerup", () => { dragging = false; dot.classList.remove("active"); buildSectionsList(); });
       hit.addEventListener("pointerenter", () => { if (!dragging) dot.classList.add("active"); });
       hit.addEventListener("pointerleave", () => { if (!dragging) dot.classList.remove("active"); });
       hit.addEventListener("dblclick", (e) => {
@@ -631,6 +641,74 @@ function updateSectionPos(si) {
 }
 
 // ---------------------------------------------------------------------------
+// Section list (below chart) + audio preview
+// ---------------------------------------------------------------------------
+let _previewAudio = null;
+function getAudio() {
+  if (!_previewAudio) { _previewAudio = new Audio(); }
+  return _previewAudio;
+}
+function playfrom(sec) {
+  if (!state.analyzedPath) return;
+  const audio = getAudio();
+  const src = "/local?path=" + encodeURIComponent(state.analyzedPath);
+  if (audio.getAttribute("data-src") !== src) {
+    audio.src = src;
+    audio.setAttribute("data-src", src);
+  }
+  audio.currentTime = sec;
+  audio.play();
+  el("secPlayheadTime").textContent = "Playing from " + fmtSec(sec);
+  el("secPlayRow").classList.remove("hidden");
+}
+
+function buildSectionsList() {
+  const list = el("sectionsList");
+  list.innerHTML = "";
+  if (!state.sections.length) return;
+
+  const tbl = document.createElement("table");
+  tbl.className = "sec-table";
+  state.sections.forEach((sec, i) => {
+    const dur = (sec.endSec - sec.startSec).toFixed(1);
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td class="sec-num">${i + 1}</td>` +
+      `<td><input class="sec-time-input" data-si="${i}" data-field="startSec" value="${fmtSec(sec.startSec)}" /></td>` +
+      `<td class="muted" style="padding:0 4px">–</td>` +
+      `<td><input class="sec-time-input" data-si="${i}" data-field="endSec" value="${fmtSec(sec.endSec)}" /></td>` +
+      `<td class="muted sec-dur">${dur}s</td>` +
+      `<td><button class="btn tiny sec-play-btn" data-si="${i}">▶</button></td>` +
+      `<td><button class="btn tiny sec-del-btn" data-si="${i}">×</button></td>`;
+    tbl.appendChild(tr);
+  });
+  list.appendChild(tbl);
+
+  list.querySelectorAll(".sec-time-input").forEach(inp => {
+    inp.addEventListener("change", () => {
+      const si = +inp.dataset.si, field = inp.dataset.field;
+      let v = Math.max(0, Math.min(state.secTotalSec, parseSec(inp.value)));
+      if (field === "startSec") v = Math.min(v, state.sections[si].endSec - 1);
+      if (field === "endSec")   v = Math.max(v, state.sections[si].startSec + 1);
+      state.sections[si][field] = v;
+      inp.value = fmtSec(v);
+      updateSectionPos(si);
+      buildSectionsList();
+    });
+  });
+  list.querySelectorAll(".sec-play-btn").forEach(btn => {
+    btn.addEventListener("click", () => playfrom(state.sections[+btn.dataset.si].startSec));
+  });
+  list.querySelectorAll(".sec-del-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.sections.splice(+btn.dataset.si, 1);
+      buildSectionsChart();
+      buildSectionsList();
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Analyze
 // ---------------------------------------------------------------------------
 async function startAnalyze() {
@@ -647,13 +725,14 @@ async function startAnalyze() {
   btn.textContent = "Analyzing…";
   try {
     const result = await bridge.analyze(inputPath);
-    console.log("analyze result:", JSON.stringify(result).slice(0, 500));
     if (result) {
+      state.analyzedPath = inputPath;
       state.loudnessSeries = result.loudnessSeries || [];
       state.secTotalSec = result.totalSec
         || (state.loudnessSeries.length ? state.loudnessSeries[state.loudnessSeries.length - 1].sec : 0);
       state.sections = (result.sections || []).map(s => ({ startSec: s.startSec, endSec: s.endSec }));
       buildSectionsChart();
+      buildSectionsList();
       el("analysisDrawer").classList.remove("hidden");
     }
   } catch (err) {

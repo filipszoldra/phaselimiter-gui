@@ -202,6 +202,15 @@ details.eq-adv { margin-top: 10px; }
 .sec-hit { fill: rgba(0,0,0,0); cursor: ew-resize; }
 .sec-empty { font-size: 11px; text-anchor: middle; dominant-baseline: middle; fill: #4a5260; font-family: var(--font); }
 
+/* ---------- section list ---------- */
+.sec-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+.sec-table td { padding: 3px 4px; vertical-align: middle; }
+.sec-num { color: var(--muted); width: 18px; text-align: right; }
+.sec-dur { width: 36px; text-align: right; }
+.sec-time-input { background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; color: var(--text); font-size: 12px; font-family: var(--font); width: 54px; padding: 2px 5px; text-align: center; }
+.sec-time-input:focus { outline: none; border-color: var(--accent); }
+.sec-play-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 12px; }
+
 /* ---------- jobs ---------- */
 .job-list { display: flex; flex-direction: column; gap: 9px; }
 .job-list .empty { text-align: center; padding: 10px; }
