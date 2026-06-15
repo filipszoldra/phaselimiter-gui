@@ -678,15 +678,17 @@ function getAudio() {
 
 function refreshPlayBtns() {
   const audio = getAudio();
+  const playing = !audio.paused;
   document.querySelectorAll(".sec-play-btn").forEach(btn => {
     const si = +btn.dataset.si;
     const sec = state.sections[si];
     if (!sec) return;
-    const inSection = !audio.paused &&
-      audio.currentTime >= sec.startSec && audio.currentTime <= sec.endSec;
+    const inSection = playing && audio.currentTime >= sec.startSec && audio.currentTime <= sec.endSec;
     btn.textContent = inSection ? "⏸" : "▶";
   });
-  if (audio.paused) {
+  const globalBtn = el("secPlayBtn");
+  if (globalBtn) globalBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
+  if (!playing) {
     el("secPlayheadTime").textContent = state.analyzedPath ? fmtSec(audio.currentTime) : "";
   }
 }
@@ -833,6 +835,10 @@ async function init() {
   });
   el("masterBtn").addEventListener("click", startMastering);
   el("analyzeBtn").addEventListener("click", startAnalyze);
+  el("secPlayBtn").addEventListener("click", () => {
+    const audio = getAudio();
+    if (audio.paused) { audio.play(); } else { audio.pause(); }
+  });
   el("eqReset").addEventListener("click", () => {
     state.eqBands = state.eqBands.map(() => 1);
     updateEQ();
