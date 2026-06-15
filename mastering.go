@@ -41,7 +41,9 @@ type Mastering struct {
 	PreCompressionThreshold float64
 	PreCompressionMeanSec   float64
 	MSMatchingLevel         float64    // mastering_ms_matching_level: stereo-field match strength (0=ignore, 1=full)
-	EQBandLevels            [9]float64 // mastering5_eq_band_levels: per-band optimizer upper-bound multipliers (1=neutral)
+	EQBandLevels            [9]float64 // mastering5_eq_band_levels: per-band optimizer upper-bound (ceiling) multipliers (1=neutral)
+	EQTransformLevels       [9]float64 // mastering5_eq_transform_levels: per-band post-opt wet_gain strength multipliers (1=neutral)
+	EQTransformSymmetric    bool       // mastering5_eq_transform_symmetric: scale cuts too (else boost-only)
 	// Section-aware mastering: re-render quiet sections with gentler settings.
 	Sections               []Section
 	SectionIntensity       float64
@@ -112,6 +114,23 @@ func (m Mastering) buildEngineArgs(inputPath, outputPath string, level float64) 
 				parts[i] = strconv.FormatFloat(v, 'f', 3, 64)
 			}
 			args = append(args, "--mastering5_eq_band_levels", strings.Join(parts, ","))
+		}
+		anyTransform := false
+		for _, v := range m.EQTransformLevels {
+			if math.Abs(v-1.0) > 1e-9 {
+				anyTransform = true
+				break
+			}
+		}
+		if anyTransform {
+			parts := make([]string, 9)
+			for i, v := range m.EQTransformLevels {
+				parts[i] = strconv.FormatFloat(v, 'f', 3, 64)
+			}
+			args = append(args, "--mastering5_eq_transform_levels", strings.Join(parts, ","))
+			if m.EQTransformSymmetric {
+				args = append(args, "--mastering5_eq_transform_symmetric", "true")
+			}
 		}
 	}
 

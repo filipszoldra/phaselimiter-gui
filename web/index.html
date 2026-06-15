@@ -80,10 +80,23 @@
 
       <div class="eq-block">
         <div class="eq-head">
-          <span>Per-band boost limit <em class="muted">drag dots (0-2, 1 = neutral)</em></span>
+          <span>Per-band EQ <em class="muted">drag dots (0–2, 1 = neutral)</em></span>
           <button id="eqReset" class="btn tiny">Reset</button>
         </div>
+        <label class="field eq-mode-row">
+          <span>Parameter affects</span>
+          <select id="eqMode">
+            <option value="oba" selected>Ceiling + transform</option>
+            <option value="sufit">Ceiling only (limits pumping)</option>
+            <option value="transformacja">Transform only (tonal level)</option>
+          </select>
+        </label>
         <div id="eqCurve"></div>
+        <details class="diag eq-adv">
+          <summary>Advanced: per-band mode &amp; symmetry</summary>
+          <label class="check"><input id="eqTransformSymmetric" type="checkbox" /> <span>Symmetric transform (also scales cuts — lowering may raise a cut band)</span></label>
+          <div id="eqBandModes" class="eq-band-modes"></div>
+        </details>
       </div>
 
       <label class="check"><input id="preserveBass" type="checkbox" /> <span>Preserve bass</span></label>
@@ -143,6 +156,12 @@
       <div class="card-head"><span class="step">6</span><h2>Section-aware mastering</h2><span class="muted">rescue quiet parts</span></div>
       <label class="check"><input id="sectionEnable" type="checkbox" /> <span>Re-render quiet sections gently</span></label>
       <div id="sectionsChart"></div>
+      <div id="secPlayRow" class="sec-play-row hidden">
+        <span id="secPlayheadTime" class="muted">Click timeline to place playhead</span>
+        <button id="secPlayBtn" class="btn tiny">▶ Play from here</button>
+      </div>
+      <div id="spectrumPanel"></div>
+      <div id="sectionsList"></div>
       <label class="field slider">
         <span class="slider-top">Section intensity <output id="sectionIntensityOut">0.25</output></span>
         <input id="sectionIntensity" type="range" min="0" max="1" step="0.05" value="0.25" />

@@ -60,6 +60,8 @@ type JobSettings struct {
 	PreCompressionMeanSec   float64    `json:"preCompressionMeanSec"`
 	MSMatchingLevel         float64    `json:"msMatchingLevel"`
 	EQBandLevels            [9]float64 `json:"eqBandLevels"`
+	EQTransformLevels       [9]float64 `json:"eqTransformLevels"`
+	EQTransformSymmetric    bool       `json:"eqTransformSymmetric"`
 	Sections                []Section  `json:"sections"`
 	SectionIntensity        float64    `json:"sectionIntensity"`
 	SectionMasteringEnable  bool       `json:"sectionMasteringEnable"`
@@ -114,6 +116,8 @@ func (app *App) startMastering(req StartReq) ([]JobView, error) {
 		m.PreCompressionMeanSec = s.PreCompressionMeanSec
 		m.MSMatchingLevel = s.MSMatchingLevel
 		m.EQBandLevels = s.EQBandLevels
+		m.EQTransformLevels = s.EQTransformLevels
+		m.EQTransformSymmetric = s.EQTransformSymmetric
 		m.Sections = append([]Section(nil), s.Sections...)
 		m.SectionIntensity = s.SectionIntensity
 		m.SectionMasteringEnable = s.SectionMasteringEnable

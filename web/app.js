@@ -20,11 +20,29 @@ const state = {
   inputs: [],
   outputDir: "",
   eqBands: [1, 1, 1, 1, 1, 1, 1, 1, 1],
+  eqMode: "oba",                                  // global target: "sufit" | "transformacja" | "oba"
+  eqBandModes: [null, null, null, null, null, null, null, null, null], // per-band override (null = inherit global)
+  eqTransformSymmetric: false,                    // transform scales cuts too (else boost-only)
   sections: [],
   loudnessSeries: [],
   secTotalSec: 0,
   jobs: new Map(),
 };
+
+// Effective target mode for band i (per-band override falls back to the global mode).
+function eqBandMode(i) { return state.eqBandModes[i] || state.eqMode; }
+
+// Route the single EQ curve into the two engine arrays per each band's mode:
+//   sufit → {ceiling:v, transform:1}; transformacja → {ceiling:1, transform:v}; oba → both v.
+function routeEqLevels() {
+  const ceiling = [], transform = [];
+  state.eqBands.forEach((v, i) => {
+    const m = eqBandMode(i);
+    ceiling.push(m === "transformacja" ? 1 : v);
+    transform.push(m === "sufit" ? 1 : v);
+  });
+  return { ceiling, transform };
+}
 
 const el = (id) => document.getElementById(id);
 const num = (id) => parseFloat(el(id).value);
@@ -53,6 +71,7 @@ function setupReadouts() {
 }
 
 function collectSettings() {
+  const eq = routeEqLevels();
   return {
     outputName: el("outputName").value.trim(),
     loudness: num("loudness"),
@@ -66,7 +85,9 @@ function collectSettings() {
     preCompressionThreshold: num("precompThreshold"),
     preCompressionMeanSec: num("precompWindow"),
     msMatchingLevel: num("stereo"),
-    eqBandLevels: state.eqBands.slice(),
+    eqBandLevels: eq.ceiling,
+    eqTransformLevels: eq.transform,
+    eqTransformSymmetric: state.eqTransformSymmetric,
     sections: state.sections,
     sectionIntensity: num("sectionIntensity"),
     sectionMasteringEnable: chk("sectionEnable"),
@@ -401,6 +422,33 @@ function updateEQ() {
   });
 }
 
+// EQ target mode: global select + advanced per-band overrides + symmetric toggle.
+function setupEQModes() {
+  el("eqMode").addEventListener("change", (e) => { state.eqMode = e.target.value; });
+  el("eqTransformSymmetric").addEventListener("change", (e) => { state.eqTransformSymmetric = e.target.checked; });
+
+  const wrap = el("eqBandModes");
+  wrap.innerHTML = "";
+  EQ_BANDS.forEach((label, i) => {
+    const row = document.createElement("label");
+    row.className = "eq-band-mode";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const sel = document.createElement("select");
+    [["", "global"], ["sufit", "Ceiling"], ["transformacja", "Transform"], ["oba", "Both"]]
+      .forEach(([val, txt]) => {
+        const o = document.createElement("option");
+        o.value = val; o.textContent = txt;
+        sel.appendChild(o);
+      });
+    sel.value = state.eqBandModes[i] || "";
+    sel.addEventListener("change", (e) => { state.eqBandModes[i] = e.target.value || null; });
+    row.appendChild(name);
+    row.appendChild(sel);
+    wrap.appendChild(row);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Sections chart (Phase D) — loudness-by-time + draggable section boundaries
 // ---------------------------------------------------------------------------
@@ -612,6 +660,7 @@ async function init() {
   setupReadouts();
   setupDnd();
   initEQ();
+  setupEQModes();
   el("addFilesBtn").addEventListener("click", addFiles);
   el("browseDirBtn").addEventListener("click", async () => {
     const d = await bridge.pickOutputDir();
