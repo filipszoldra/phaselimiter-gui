@@ -634,19 +634,29 @@ function updateSectionPos(si) {
 // Analyze
 // ---------------------------------------------------------------------------
 async function startAnalyze() {
-  if (HAS_GO && !state.inputs.length) { flash(el("analyzeBtn")); return; }
+  // If no file in the mastering queue, pick one just for analysis.
+  let inputPath = state.inputs[0] || "";
+  if (HAS_GO && !inputPath) {
+    const picked = await bridge.pickInputFiles();
+    if (!picked || !picked.length) return;
+    inputPath = picked[0];
+  }
+
   const btn = el("analyzeBtn");
   btn.disabled = true;
   btn.textContent = "Analyzing…";
   try {
-    const result = await bridge.analyze(state.inputs[0] || "");
+    const result = await bridge.analyze(inputPath);
     if (result) {
       state.loudnessSeries = result.loudnessSeries || [];
       state.secTotalSec = result.totalSec
         || (state.loudnessSeries.length ? state.loudnessSeries[state.loudnessSeries.length - 1].sec : 0);
       state.sections = (result.sections || []).map(s => ({ startSec: s.startSec, endSec: s.endSec }));
       buildSectionsChart();
+      el("analysisDrawer").classList.remove("hidden");
     }
+  } catch (err) {
+    alert("Analyze failed: " + err);
   } finally {
     btn.disabled = false;
     btn.textContent = "Analyze";
