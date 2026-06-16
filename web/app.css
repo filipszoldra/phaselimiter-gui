@@ -172,11 +172,9 @@ details.eq-adv { margin-top: 10px; }
 /* SVG EQ curve */
 .eq-svg { display: block; width: 100%; height: auto; overflow: visible; user-select: none; }
 .eq-guide { fill: none; stroke: var(--line-soft); stroke-width: 1; }
-.eq-neutral { stroke: var(--muted); stroke-dasharray: none; stroke-width: 1.5; opacity: 0.5; }
+.eq-neutral { stroke: var(--muted); stroke-dasharray: 4 3; stroke-width: 1.5; opacity: 0.5; }
 .eq-area { stroke: none; fill: var(--accent-dim); opacity: 0.4; }
 .eq-curve { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.eq-orange { fill: none; stroke: #f5a030; stroke-width: 1.5; stroke-dasharray: 5 3; stroke-linejoin: round; stroke-linecap: round; }
-.eq-orange-area { stroke: none; fill: #f5a030; opacity: 0.18; }
 .eq-hit { fill: white; fill-opacity: 0; cursor: ns-resize; }
 .eq-dot { fill: var(--accent); stroke: #2a0f20; stroke-width: 2; pointer-events: none; }
 .eq-dot.active { fill: var(--accent-soft); }
@@ -242,7 +240,8 @@ details.eq-adv { margin-top: 10px; }
 .ab-delta        { font-size: 8.5px; text-anchor: middle; dominant-baseline: auto; font-weight: 600; font-family: var(--font); pointer-events: none; }
 .ab-delta.pos    { fill: var(--accent-soft); }
 .ab-delta.neg    { fill: #e05555; }
-.ab-metrics { display: flex; gap: 14px; font-size: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.ab-metrics { display: flex; flex-direction: column; gap: 5px; font-size: 12px; margin-bottom: 10px; }
+.ab-metrics .metric-row { display: flex; justify-content: space-between; gap: 12px; }
 .ab-metrics span { color: var(--muted); }
 .ab-metrics strong { color: var(--text); }
 
@@ -325,3 +324,4 @@ details.eq-adv { margin-top: 10px; }
 
 /* ---------- spectrogram image ---------- */
 .spectro { display: block; width: 100%; border-radius: 6px; margin-top: 10px; }
+#analysisSpectro { height: 160px; object-fit: fill; }
