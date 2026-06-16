@@ -172,9 +172,11 @@ details.eq-adv { margin-top: 10px; }
 /* SVG EQ curve */
 .eq-svg { display: block; width: 100%; height: auto; overflow: visible; user-select: none; }
 .eq-guide { fill: none; stroke: var(--line-soft); stroke-width: 1; }
-.eq-neutral { stroke: var(--accent-dim); stroke-dasharray: 5 3; stroke-width: 1.5; }
+.eq-neutral { stroke: var(--muted); stroke-dasharray: none; stroke-width: 1.5; opacity: 0.5; }
 .eq-area { stroke: none; fill: var(--accent-dim); opacity: 0.4; }
-.eq-curve { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.eq-curve { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.eq-orange { fill: none; stroke: #f5a030; stroke-width: 1.5; stroke-dasharray: 5 3; stroke-linejoin: round; stroke-linecap: round; }
+.eq-orange-area { stroke: none; fill: #f5a030; opacity: 0.18; }
 .eq-hit { fill: white; fill-opacity: 0; cursor: ns-resize; }
 .eq-dot { fill: var(--accent); stroke: #2a0f20; stroke-width: 2; pointer-events: none; }
 .eq-dot.active { fill: var(--accent-soft); }

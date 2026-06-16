@@ -21,7 +21,7 @@ const bridge = {
 const state = {
   inputs: [],
   outputDir: "",
-  eqBands: [1, 1, 1, 1, 1, 1, 1, 1, 1],
+  eqBands: [0, 0, 0, 0, 0, 0, 0, 0, 0],
   eqMode: "oba",                                  // global target: "sufit" | "transformacja" | "oba"
   eqBandModes: [null, null, null, null, null, null, null, null, null], // per-band override (null = inherit global)
   eqTransformSymmetric: false,                    // transform scales cuts too (else boost-only)
@@ -43,10 +43,11 @@ function eqBandMode(i) { return state.eqBandModes[i] || state.eqMode; }
 //   sufit → {ceiling:v, transform:1}; transformacja → {ceiling:1, transform:v}; oba → both v.
 function routeEqLevels() {
   const ceiling = [], transform = [];
-  state.eqBands.forEach((v, i) => {
+  state.eqBands.forEach((db, i) => {
+    const mult = 1 + db / 12;  // dB (-12..+12) -> multiplier (0..2)
     const m = eqBandMode(i);
-    ceiling.push(m === "transformacja" ? 1 : v);
-    transform.push(m === "sufit" ? 1 : v);
+    ceiling.push(m === "transformacja" ? 1 : mult);
+    transform.push(m === "sufit" ? 1 : mult);
   });
   return { ceiling, transform };
 }
@@ -539,8 +540,8 @@ const EQ_CW = EQ_W - EQ_PL - EQ_PR;
 const EQ_CH = EQ_H - EQ_PT - EQ_PB;
 
 function eqX(i) { return EQ_PL + (i / 8) * EQ_CW; }
-function eqY(v) { return EQ_PT + EQ_CH * (1 - v / 2); }
-function eqVfromY(y) { return Math.max(0, Math.min(2, (1 - (y - EQ_PT) / EQ_CH) * 2)); }
+function eqY(db) { return EQ_PT + EQ_CH * (1 - (db + 12) / 24); }   // -12..+12 dB
+function eqVfromY(y) { return Math.max(-12, Math.min(12, ((1 - (y - EQ_PT) / EQ_CH) * 24) - 12)); }
 
 function eqSmooth(pts) {
   let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
@@ -555,6 +556,7 @@ function eqSmooth(pts) {
 }
 
 let _eqDotEls = [], _eqValEls = [], _eqPathEl = null, _eqAreaEl = null;
+let _eqOrangePathEl = null, _eqOrangeAreaEl = null, _eqSvgEl = null;
 
 function initEQ() {
   const container = el("eqCurve");
@@ -563,38 +565,45 @@ function initEQ() {
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${EQ_W} ${EQ_H}`);
   svg.classList.add("eq-svg");
+  _eqSvgEl = svg;
 
-  // horizontal guides at 0, 0.5, 1, 1.5, 2
-  [0, 0.5, 1, 1.5, 2].forEach(v => {
+  // horizontal guides at -12, -6, 0, +6, +12 dB
+  [-12, -6, 0, 6, 12].forEach(db => {
     const ln = document.createElementNS(ns, "line");
-    const y = eqY(v);
+    const y = eqY(db);
     ln.setAttribute("x1", EQ_PL); ln.setAttribute("x2", EQ_W - EQ_PR);
     ln.setAttribute("y1", y); ln.setAttribute("y2", y);
-    ln.setAttribute("class", v === 1 ? "eq-guide eq-neutral" : "eq-guide");
+    ln.setAttribute("class", db === 0 ? "eq-guide eq-neutral" : "eq-guide");
     svg.appendChild(ln);
     const t = document.createElementNS(ns, "text");
     t.setAttribute("x", EQ_W - EQ_PR + 5); t.setAttribute("y", y);
     t.setAttribute("class", "eq-scale");
-    t.textContent = v % 1 ? v.toFixed(1) : v.toFixed(0);
+    t.textContent = db === 0 ? "0" : (db > 0 ? `+${db}` : db);
     svg.appendChild(t);
   });
 
-  // area fill between curve and neutral line
-  const area = document.createElementNS(ns, "path");
-  area.setAttribute("class", "eq-area");
-  svg.appendChild(area);
-  _eqAreaEl = area;
+  // orange area fill (between 0-line and orange/computed curve)
+  const orangeArea = document.createElementNS(ns, "path");
+  orangeArea.setAttribute("class", "eq-orange-area");
+  svg.appendChild(orangeArea);
+  _eqOrangeAreaEl = orangeArea;
 
-  // smooth curve line
+  // orange dashed curve (pink * intensity = expected automastering result)
+  const orangePath = document.createElementNS(ns, "path");
+  orangePath.setAttribute("class", "eq-orange");
+  svg.appendChild(orangePath);
+  _eqOrangePathEl = orangePath;
+
+  // pink smooth curve (user's intent)
   const path = document.createElementNS(ns, "path");
   path.setAttribute("class", "eq-curve");
   svg.appendChild(path);
   _eqPathEl = path;
 
-  // one group per band: hit circle, visible dot, value label, band name
+  // dots + hits + labels per band
   _eqDotEls = []; _eqValEls = [];
-  state.eqBands.forEach((v, i) => {
-    const cx = eqX(i), cy = eqY(v);
+  state.eqBands.forEach((db, i) => {
+    const cx = eqX(i), cy = eqY(db);
 
     const hit = document.createElementNS(ns, "circle");
     hit.setAttribute("cx", cx); hit.setAttribute("cy", cy); hit.setAttribute("r", "16");
@@ -605,9 +614,9 @@ function initEQ() {
     dot.setAttribute("class", "eq-dot");
 
     const valTxt = document.createElementNS(ns, "text");
-    valTxt.setAttribute("x", cx); valTxt.setAttribute("y", cy - 13);
+    valTxt.setAttribute("x", cx); valTxt.setAttribute("y", (cy - 12).toFixed(1));
     valTxt.setAttribute("class", "eq-val");
-    valTxt.textContent = v.toFixed(2);
+    valTxt.textContent = "";
 
     const bandTxt = document.createElementNS(ns, "text");
     bandTxt.setAttribute("x", cx); bandTxt.setAttribute("y", EQ_H - 22);
@@ -623,7 +632,7 @@ function initEQ() {
     svg.appendChild(valTxt);
     svg.appendChild(bandTxt);
     svg.appendChild(hzTxt);
-    svg.appendChild(hit);   // last = on top, catches all pointer events
+    svg.appendChild(hit);
     _eqDotEls.push({ hit, dot });
     _eqValEls.push(valTxt);
 
@@ -637,13 +646,13 @@ function initEQ() {
       if (!dragging) return;
       const rect = svg.getBoundingClientRect();
       const rawY = (e.clientY - rect.top) / rect.height * EQ_H;
-      const newV = Math.round(eqVfromY(rawY) * 100) / 100;
+      const newV = Math.round(eqVfromY(rawY) * 2) / 2;  // snap to 0.5 dB
       if (state.eqBands[i] === newV) return;
       state.eqBands[i] = newV;
       updateEQ();
     });
     hit.addEventListener("pointerup", () => { dragging = false; dot.classList.remove("active"); });
-    hit.addEventListener("dblclick", () => { state.eqBands[i] = 1; updateEQ(); });
+    hit.addEventListener("dblclick", () => { state.eqBands[i] = 0; updateEQ(); });
   });
 
   container.appendChild(svg);
@@ -651,24 +660,41 @@ function initEQ() {
 }
 
 function updateEQ() {
-  const pts = state.eqBands.map((v, i) => ({ x: eqX(i), y: eqY(v) }));
-  const curvePath = eqSmooth(pts);
-  _eqPathEl.setAttribute("d", curvePath);
+  const intensity = num("intensity");
+  const ny = eqY(0);  // y-coordinate of the 0 dB line
 
-  // area between curve and neutral (y=1 line)
-  const ny = eqY(1);
-  const first = pts[0], last = pts[pts.length - 1];
-  _eqAreaEl.setAttribute("d",
-    curvePath + ` L ${last.x.toFixed(1)} ${ny.toFixed(1)} L ${first.x.toFixed(1)} ${ny.toFixed(1)} Z`
+  // Pink: user's intent curve
+  const pinkPts = state.eqBands.map((db, i) => ({ x: eqX(i), y: eqY(db) }));
+  const pinkPath = eqSmooth(pinkPts);
+  _eqPathEl.setAttribute("d", pinkPath);
+
+  // Orange: expected result = intent * intensity
+  const orangeDb = state.eqBands.map(db => db * intensity);
+  const orangePts = orangeDb.map((db, i) => ({ x: eqX(i), y: eqY(db) }));
+  const orangePath = eqSmooth(orangePts);
+  _eqOrangePathEl.setAttribute("d", orangePath);
+
+  // Orange area fill: between 0-dB line and orange curve
+  const of = orangePts[0], ol = orangePts[orangePts.length - 1];
+  _eqOrangeAreaEl.setAttribute("d",
+    orangePath + ` L ${ol.x.toFixed(1)} ${ny.toFixed(1)} L ${of.x.toFixed(1)} ${ny.toFixed(1)} Z`
   );
 
+  // Dots + labels
   _eqDotEls.forEach(({ hit, dot }, i) => {
-    const cx = eqX(i), cy = eqY(state.eqBands[i]);
+    const db = state.eqBands[i];
+    const cx = eqX(i), cy = eqY(db);
     hit.setAttribute("cx", cx); hit.setAttribute("cy", cy);
     dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+    const above = cy > eqY(6);  // label below dot if near top
     _eqValEls[i].setAttribute("x", cx);
-    _eqValEls[i].setAttribute("y", (cy - 13).toFixed(1));
-    _eqValEls[i].textContent = state.eqBands[i].toFixed(2);
+    _eqValEls[i].setAttribute("y", (above ? cy - 12 : cy + 18).toFixed(1));
+    if (Math.abs(db) >= 0.5) {
+      _eqValEls[i].textContent = (db > 0 ? "+" : "") + db.toFixed(1);
+      _eqValEls[i].removeAttribute("visibility");
+    } else {
+      _eqValEls[i].setAttribute("visibility", "hidden");
+    }
   });
 }
 
@@ -1322,8 +1348,9 @@ async function init() {
     const audio = getAudio();
     if (audio.paused) { audio.play(); } else { audio.pause(); }
   });
+  el("intensity").addEventListener("input", updateEQ);
   el("eqReset").addEventListener("click", () => {
-    state.eqBands = state.eqBands.map(() => 1);
+    state.eqBands = state.eqBands.map(() => 0);
     updateEQ();
   });
   el("analysisToggle").addEventListener("click", () => el("analysisDrawer").classList.toggle("hidden"));
