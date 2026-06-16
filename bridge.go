@@ -80,6 +80,7 @@ type StartReq struct {
 
 func (app *App) pickInputFiles() ([]string, error) { return selectAudioFiles() }
 func (app *App) pickOutputDir() (string, error)    { return selectDirectory() }
+
 func (app *App) analyze(input string) (*AnalysisResult, error) {
 	log.Printf("analyze: input=%q ffmpeg=%q", input, app.analyzer.Ffmpeg)
 	result, err := app.analyzer.AnalyzeAudio(input)
@@ -87,6 +88,17 @@ func (app *App) analyze(input string) (*AnalysisResult, error) {
 		log.Printf("analyze error: %v", err)
 	} else {
 		log.Printf("analyze ok: %.0fs, %d samples, %d sections", result.TotalSec, len(result.LoudnessSeries), len(result.Sections))
+	}
+	return result, err
+}
+
+func (app *App) analyzeFull(input string) (*AnalysisResult, error) {
+	log.Printf("analyzeFull: input=%q", input)
+	result, err := app.analyzer.AnalyzeAudioFull(input)
+	if err != nil {
+		log.Printf("analyzeFull error: %v", err)
+	} else {
+		log.Printf("analyzeFull ok: %.0fs, LUFS=%.1f, spectro=%q", result.TotalSec, result.GlobalLoudness, result.SpectrogramURL)
 	}
 	return result, err
 }

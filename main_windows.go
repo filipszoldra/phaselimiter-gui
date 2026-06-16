@@ -67,6 +67,7 @@ func main() {
 	w.Bind("plDefaultOutputDir", func() string { return getDefaultOutputDir() })
 	w.Bind("plStartMastering", app.startMastering)
 	w.Bind("plAnalyze", app.analyze)
+	w.Bind("plAnalyzeFull", app.analyzeFull)
 	w.Bind("plGetReference", app.getReference)
 
 	// Push every mastering status/progress update to the page.

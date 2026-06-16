@@ -14,6 +14,7 @@ const bridge = {
   defaultOutputDir: HAS_GO ? window.plDefaultOutputDir : async () => "C:\\Users\\you\\Downloads",
   startMastering: HAS_GO ? window.plStartMastering : mockStartMastering,
   analyze: typeof window.plAnalyze === "function" ? window.plAnalyze : mockAnalyze,
+  analyzeFull: typeof window.plAnalyzeFull === "function" ? window.plAnalyzeFull : mockAnalyzeFull,
   getReference: typeof window.plGetReference === "function" ? window.plGetReference : mockGetReference,
 };
 
@@ -184,26 +185,93 @@ function renderJob(j) {
     node.dataset.id = j.id;
     list.prepend(node);
   }
+  // Preserve result panel across re-renders caused by progress updates
+  const savedResult = node.querySelector(".job-result");
   node.innerHTML = jobRowHTML(j);
+  if (savedResult) node.appendChild(savedResult);
+
+  if (j.status === "succeeded" && !node.dataset.resultFetched) {
+    node.dataset.resultFetched = "1";
+    fetchJobResult(j, node);
+  }
   updateOverallProgress();
+}
+
+async function fetchJobResult(j, node) {
+  const loadBar = document.createElement("div");
+  loadBar.className = "job-result";
+  loadBar.innerHTML = '<div class="bar-indeterminate" style="margin:4px 0 0"></div>';
+  node.appendChild(loadBar);
+  try {
+    const result = await bridge.analyzeFull(j.output);
+    loadBar.remove();
+    if (!result) return;
+    const panel = document.createElement("div");
+    panel.className = "job-result";
+    panel.innerHTML = renderJobResultHTML(result);
+    node.appendChild(panel);
+    panel.querySelector(".job-result-head").addEventListener("click", () => {
+      const body = panel.querySelector(".job-result-body");
+      const tog = panel.querySelector(".job-result-toggle");
+      body.classList.toggle("hidden");
+      tog.textContent = body.classList.contains("hidden") ? "+" : "-";
+    });
+  } catch (e) {
+    loadBar.remove();
+    console.warn("analyze output failed:", e);
+  }
+}
+
+function renderJobResultHTML(result) {
+  const lufs = result.globalLoudness ? `${result.globalLoudness.toFixed(1)} LUFS` : "n/a";
+  const tp   = result.truePeak       ? `${result.truePeak.toFixed(1)} dBTP`       : "n/a";
+  const lra  = result.loudnessRange  ? `${result.loudnessRange.toFixed(1)} LU`    : "n/a";
+  const dur  = result.totalSec       ? fmtSec(result.totalSec)                    : "n/a";
+  const spectroHTML = result.spectrogramURL
+    ? `<img class="spectro" src="${result.spectrogramURL}" alt="Spectrogram" />`
+    : "";
+  return `
+    <div class="job-result-head">
+      <span class="job-result-toggle">+</span>
+      <span>Output analysis</span>
+    </div>
+    <div class="job-result-body hidden">
+      <div class="job-result-metrics">
+        <span>LUFS</span><strong>${lufs}</strong>
+        <span>True-peak</span><strong>${tp}</strong>
+        <span>LRA</span><strong>${lra}</strong>
+        <span>Duration</span><strong>${dur}</strong>
+      </div>
+      ${spectroHTML}
+    </div>`;
 }
 
 function updateOverallProgress() {
   const jobs = [...state.jobs.values()];
-  const active = jobs.filter((j) => j.status === "processing" || j.status === "waiting");
   const strip = el("progressStrip");
-  if (!active.length) {
-    const done = jobs.filter((j) => j.status === "succeeded").length;
-    el("progressFill").style.width = jobs.length ? "100%" : "0%";
-    el("progressLabel").textContent = jobs.length ? `Done: ${done}/${jobs.length} succeeded` : "Idle";
-    if (jobs.length) setTimeout(() => strip.classList.add("hidden"), 1500);
+  if (!jobs.length) {
+    el("progressFill").style.width = "0%";
+    el("progressLabel").textContent = "Idle";
+    strip.classList.add("hidden");
+    return;
+  }
+  const processing = jobs.find(j => j.status === "processing");
+  const finished = jobs.filter(j => j.status !== "processing" && j.status !== "waiting").length;
+  const total = jobs.length;
+
+  if (!processing) {
+    const succeeded = jobs.filter(j => j.status === "succeeded").length;
+    el("progressFill").style.width = finished === total ? "100%" : "0%";
+    el("progressLabel").textContent = finished === total
+      ? `Done: ${succeeded}/${total} succeeded`
+      : "Queued...";
+    if (finished === total) setTimeout(() => strip.classList.add("hidden"), 1500);
     return;
   }
   strip.classList.remove("hidden");
-  const avg = jobs.reduce((s, j) => s + (j.status === "succeeded" ? 1 : j.progress || 0), 0) / jobs.length;
-  el("progressFill").style.width = `${Math.round(avg * 100)}%`;
-  const cur = active.find((j) => j.status === "processing");
-  el("progressLabel").textContent = cur ? `Mastering ${baseName(cur.input)}…` : "Queued…";
+  const pct = Math.round((processing.progress || 0) * 100);
+  el("progressFill").style.width = `${pct}%`;
+  el("progressLabel").textContent = `Song ${finished + 1}/${total} - ${baseName(processing.input)}`;
 }
 
 window.plOnJobUpdate = (j) => renderJob(j);
@@ -291,6 +359,23 @@ function mockAnalysisData() {
 
 function mockAnalyze() {
   return new Promise(resolve => setTimeout(() => resolve(mockAnalysisData()), 700));
+}
+
+function mockAnalyzeFull(path) {
+  return new Promise(resolve => setTimeout(() => {
+    const base = mockAnalysisData();
+    resolve({
+      ...base,
+      truePeak: -0.8,
+      loudnessRange: 6.2,
+      dynamics: 3.1,
+      sharpness: 1.2,
+      space: -3.5,
+      sampleRate: 44100,
+      peak: -0.5,
+      spectrogramURL: "",
+    });
+  }, 1800));
 }
 
 function mockGetReference() {
@@ -993,7 +1078,6 @@ function buildSectionsList() {
 // Analyze
 // ---------------------------------------------------------------------------
 async function startAnalyze(forcePath) {
-  // If no file in the mastering queue, pick one just for analysis.
   let inputPath = forcePath || state.inputs[0] || "";
   if (HAS_GO && !inputPath) {
     const picked = await bridge.pickInputFiles();
@@ -1005,9 +1089,10 @@ async function startAnalyze(forcePath) {
   state._analyzeInFlight = true;
   const btn = el("analyzeBtn");
   btn.disabled = true;
-  btn.textContent = "Analyzing…";
+  btn.textContent = "Analyzing...";
+  el("analysisProgress").classList.remove("hidden");
   try {
-    const result = await bridge.analyze(inputPath);
+    const result = await bridge.analyzeFull(inputPath);
     if (result) {
       state.analyzedPath = inputPath;
       state.loudnessSeries = result.loudnessSeries || [];
@@ -1024,28 +1109,65 @@ async function startAnalyze(forcePath) {
     alert("Analyze failed: " + err);
   } finally {
     state._analyzeInFlight = false;
+    el("analysisProgress").classList.add("hidden");
     btn.disabled = false;
     btn.textContent = "Analyze";
   }
 }
 
 function renderAnalysisDrawer(result) {
-  // Global metrics
+  // Extended metrics in the drawer
   const metricsEl = el("analysisMetrics");
-  if (result.globalLoudness) {
-    metricsEl.innerHTML =
-      `<span>Loudness</span><strong>${result.globalLoudness.toFixed(1)} LUFS</strong>` +
-      `<span>Duration</span><strong>${fmtSec(result.totalSec || 0)}</strong>`;
+  const parts = [];
+  if (result.globalLoudness) parts.push(`<span>Loudness</span><strong>${result.globalLoudness.toFixed(1)} LUFS</strong>`);
+  if (result.truePeak)       parts.push(`<span>True-peak</span><strong>${result.truePeak.toFixed(1)} dBTP</strong>`);
+  if (result.loudnessRange)  parts.push(`<span>LRA</span><strong>${result.loudnessRange.toFixed(1)} LU</strong>`);
+  if (result.dynamics)       parts.push(`<span>Dynamics</span><strong>${result.dynamics.toFixed(1)} dB</strong>`);
+  if (result.totalSec)       parts.push(`<span>Duration</span><strong>${fmtSec(result.totalSec)}</strong>`);
+  if (result.sampleRate)     parts.push(`<span>Sample rate</span><strong>${(result.sampleRate / 1000).toFixed(1)} kHz</strong>`);
+  if (parts.length) {
+    metricsEl.innerHTML = parts.join("");
     metricsEl.classList.remove("hidden");
   } else {
     metricsEl.classList.add("hidden");
   }
 
-  // Per-band chart (redraws SVG from state.analysisBands)
+  // Spectrogram image
+  const spectroEl = el("analysisSpectro");
+  if (result.spectrogramURL) {
+    spectroEl.src = result.spectrogramURL;
+    spectroEl.classList.remove("hidden");
+  } else {
+    spectroEl.classList.add("hidden");
+  }
+
+  // Per-band chart now lives in card 2
   initAnalysisBandChart();
 
   // Show EQ enable row only when bands available
   el("analysisEqRow").classList.toggle("hidden", !state.analysisBands);
+}
+
+// ---------------------------------------------------------------------------
+// Help popovers
+// ---------------------------------------------------------------------------
+function setupHelp() {
+  let activePop = null;
+  let activeBtn = null;
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".help");
+    if (activePop) { activePop.remove(); activePop = null; }
+    if (!btn || btn === activeBtn) { activeBtn = null; return; }
+    activeBtn = btn;
+    const pop = document.createElement("div");
+    pop.className = "help-pop";
+    pop.textContent = btn.dataset.help;
+    document.body.appendChild(pop);
+    const r = btn.getBoundingClientRect();
+    pop.style.top = `${r.bottom + 6}px`;
+    pop.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 252))}px`;
+    activePop = pop;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1062,6 +1184,7 @@ async function initReferenceProfile() {
 async function init() {
   setupReadouts();
   setupDnd();
+  setupHelp();
   initEQ();
   setupEQModes();
   el("addFilesBtn").addEventListener("click", addFiles);

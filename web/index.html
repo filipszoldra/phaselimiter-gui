@@ -58,9 +58,10 @@
     <section class="card">
       <div class="card-head"><span class="step">1</span><h2>Loudness target</h2><span class="muted">biggest lever</span></div>
       <label class="field slider">
-        <span class="slider-top">Target loudness <output id="loudnessOut">–14 LUFS</output></span>
+        <span class="slider-top"><span>Target loudness <button class="help" type="button" data-help="Integrated loudness the master aims for (LUFS). Louder (toward 0) drives the limiter harder, adding crunch/pumping. -9 to -14 is typical for streaming/club.">?</button></span> <output id="loudnessOut">–14 LUFS</output></span>
         <input id="loudness" type="range" min="-20" max="0" step="0.5" value="-14" />
         <span class="scale"><i>–20 (quiet)</i><i>0 (loud)</i></span>
+        <span class="rec-hint">recommended −9 to −14 LUFS</span>
       </label>
     </section>
 
@@ -69,37 +70,53 @@
       <div class="card-head"><span class="step">2</span><h2>AutoMastering5</h2><span class="muted">tone &amp; stereo</span></div>
       <div class="grid2">
         <label class="field slider">
-          <span class="slider-top">Intensity <output id="intensityOut">0.50</output></span>
-          <input id="intensity" type="range" min="0" max="1" step="0.01" value="0.5" />
+          <span class="slider-top"><span>Intensity <button class="help" type="button" data-help="How strongly AutoMastering5 reshapes tone and dynamics (0-1). Lower = gentler, less coloration. 0.3-0.5 is a good starting point for most music.">?</button></span> <output id="intensityOut">0.40</output></span>
+          <input id="intensity" type="range" min="0" max="1" step="0.01" value="0.4" />
+          <span class="rec-hint">recommended 0.3-0.5</span>
         </label>
         <label class="field slider">
-          <span class="slider-top">Stereo match <output id="stereoOut">1.00</output></span>
+          <span class="slider-top"><span>Stereo match <button class="help" type="button" data-help="How closely the stereo width matches the reference profile (0-1). 1 = full match, 0 = bypass stereo adjustment.">?</button></span> <output id="stereoOut">1.00</output></span>
           <input id="stereo" type="range" min="0" max="1" step="0.05" value="1" />
         </label>
       </div>
 
-      <div class="eq-block">
-        <div class="eq-head">
-          <span>Per-band EQ <em class="muted">drag dots (0–2, 1 = neutral)</em></span>
-          <button id="eqReset" class="btn tiny">Reset</button>
-        </div>
-        <label class="field eq-mode-row">
-          <span>Parameter affects</span>
-          <select id="eqMode">
-            <option value="oba" selected>Ceiling + transform</option>
-            <option value="sufit">Ceiling only (limits pumping)</option>
-            <option value="transformacja">Transform only (tonal level)</option>
-          </select>
+      <div id="analysisProgress" class="bar-indeterminate hidden"></div>
+      <div id="analysisBandChart">
+        <p class="muted" style="font-size:12px;margin:16px 0">Add a file - analysis starts automatically.</p>
+      </div>
+      <div id="analysisEqRow" class="hidden" style="margin-top:10px">
+        <label class="check">
+          <input id="analysisEqEnable" type="checkbox" />
+          <span>Enable EQ correction <em class="muted">(applied between automastering &amp; limiter)</em></span>
         </label>
-        <div id="eqCurve"></div>
-        <details class="diag eq-adv">
-          <summary>Advanced: per-band mode &amp; symmetry</summary>
-          <label class="check"><input id="eqTransformSymmetric" type="checkbox" /> <span>Symmetric transform (also scales cuts — lowering may raise a cut band)</span></label>
-          <div id="eqBandModes" class="eq-band-modes"></div>
-        </details>
+        <p id="analysisEqNote" class="muted" style="font-size:11px;margin:6px 0 0 25px">Blue = your target (drag per band). Red = your track. Applied as static gain after automastering.</p>
       </div>
 
-      <label class="check"><input id="preserveBass" type="checkbox" /> <span>Preserve bass</span></label>
+      <label class="check"><input id="preserveBass" type="checkbox" checked /> <span>Preserve bass <button class="help" type="button" data-help="Applies perceptual weighting that protects low-frequency content from limiter-induced bass reduction. Keep ON for most music.">?</button></span></label>
+
+      <details class="diag eq-adv">
+        <summary>Advanced: per-band optimizer</summary>
+        <div class="eq-block">
+          <div class="eq-head">
+            <span>Per-band EQ <em class="muted">drag dots (0-2, 1 = neutral)</em></span>
+            <button id="eqReset" class="btn tiny">Reset</button>
+          </div>
+          <label class="field eq-mode-row">
+            <span>Parameter affects</span>
+            <select id="eqMode">
+              <option value="oba" selected>Ceiling + transform</option>
+              <option value="sufit">Ceiling only (limits pumping)</option>
+              <option value="transformacja">Transform only (tonal level)</option>
+            </select>
+          </label>
+          <div id="eqCurve"></div>
+          <details class="diag">
+            <summary>Per-band mode &amp; symmetry</summary>
+            <label class="check"><input id="eqTransformSymmetric" type="checkbox" /> <span>Symmetric transform (also scales cuts - lowering may raise a cut band)</span></label>
+            <div id="eqBandModes" class="eq-band-modes"></div>
+          </details>
+        </div>
+      </details>
 
       <details class="diag">
         <summary>Diagnostic</summary>
@@ -109,7 +126,7 @@
 
     <!-- 3 PRE-COMPRESSION -->
     <section class="card">
-      <div class="card-head"><span class="step">3</span><h2>Pre-compression</h2><span class="muted">tames pumping</span></div>
+      <div class="card-head"><span class="step">3</span><h2>Pre-compression <button class="help" type="button" data-help="A gentle compressor applied before the phase limiter. It tames transient peaks early, reducing pumping in the final limiter stage. Higher threshold offset = less compression.">?</button></h2><span class="muted">tames pumping</span></div>
       <label class="check"><input id="precomp" type="checkbox" checked /> <span>Enabled</span></label>
       <div class="grid2">
         <label class="field slider">
@@ -146,14 +163,14 @@
     <section class="card">
       <div class="card-head"><span class="step">5</span><h2>Ceiling</h2><span class="muted">true-peak headroom</span></div>
       <label class="field slider">
-        <span class="slider-top">True-peak ceiling <output id="ceilingOut">–1.0 dB</output></span>
+        <span class="slider-top"><span>True-peak ceiling <button class="help" type="button" data-help="Maximum allowed true-peak level of the master. -1 dB gives 1 dB of headroom below 0 dBFS, preventing inter-sample clipping during lossy encode (MP3/AAC/streaming).">?</button></span> <output id="ceilingOut">-1.0 dB</output></span>
         <input id="ceiling" type="range" min="-3" max="0" step="0.1" value="-1" />
       </label>
     </section>
 
     <!-- 6 SECTION-AWARE -->
     <section class="card">
-      <div class="card-head"><span class="step">6</span><h2>Section-aware mastering</h2><span class="muted">rescue quiet parts</span></div>
+      <div class="card-head"><span class="step">6</span><h2>Section-aware mastering <button class="help" type="button" data-help="Detects quiet sections (intro, outro, breakdowns) and applies a gentler intensity to avoid over-compression in those parts. Uses crossfade to blend back into the main master.">?</button></h2><span class="muted">rescue quiet parts</span></div>
       <label class="check"><input id="sectionEnable" type="checkbox" /> <span>Re-render quiet sections gently</span></label>
       <div id="sectionsChart"></div>
       <div id="secPlayRow" class="sec-play-row hidden">
@@ -179,16 +196,7 @@
   <aside id="analysisDrawer" class="analysis-drawer hidden">
     <div class="drawer-head"><h2>Track analysis</h2><button id="analysisClose" class="btn ghost small">Close</button></div>
     <div id="analysisMetrics" class="ab-metrics hidden"></div>
-    <div id="analysisBandChart">
-      <p class="muted" style="font-size:12px;margin:16px 0">Add a file — analysis starts automatically.</p>
-    </div>
-    <div id="analysisEqRow" class="hidden" style="margin-top:10px">
-      <label class="check">
-        <input id="analysisEqEnable" type="checkbox" />
-        <span>Enable EQ correction <em class="muted">(applied between automastering &amp; limiter)</em></span>
-      </label>
-      <p id="analysisEqNote" class="muted" style="font-size:11px;margin:6px 0 0 25px">Blue = your target (drag per band). Red = your track. Applied as static gain after automastering.</p>
-    </div>
+    <img id="analysisSpectro" class="spectro hidden" alt="Spectrogram" />
   </aside>
 
   <script src="app.js"></script>

@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
-	"runtime"
 	"sync"
 )
 
@@ -251,13 +252,22 @@ type BandSample struct {
 	SideMean float64 `json:"sideMean"`
 }
 
-// AnalysisResult is returned to the frontend by plAnalyze.
+// AnalysisResult is returned to the frontend by plAnalyze / plAnalyzeFull.
 type AnalysisResult struct {
 	TotalSec       float64          `json:"totalSec"`
 	LoudnessSeries []LoudnessSample `json:"loudnessSeries"`
 	Sections       []SectionBound   `json:"sections"`
-	Bands          []BandSample     `json:"bands"`         // nil when audio_analyzer is absent
+	Bands          []BandSample     `json:"bands"`          // nil when audio_analyzer is absent
 	GlobalLoudness float64          `json:"globalLoudness"` // integrated LUFS (0 when unavailable)
+	// Extended fields - populated by AnalyzeAudioFull (plAnalyzeFull)
+	TruePeak       float64 `json:"truePeak,omitempty"`
+	LoudnessRange  float64 `json:"loudnessRange,omitempty"`
+	Dynamics       float64 `json:"dynamics,omitempty"`
+	Sharpness      float64 `json:"sharpness,omitempty"`
+	Space          float64 `json:"space,omitempty"`
+	SampleRate     float64 `json:"sampleRate,omitempty"`
+	Peak           float64 `json:"peak,omitempty"`
+	SpectrogramURL string  `json:"spectrogramURL,omitempty"`
 }
 
 // LoudnessSample is one 0.5 s bucket of the loudness timeline.
@@ -349,6 +359,72 @@ func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
 		}
 	}
 
+	return result, nil
+}
+
+// imageDirForPath returns a stable temp directory for analysis images of audioPath.
+// The directory name is derived from the base filename so the same file always
+// writes to the same dir; different files get different dirs. Images persist for
+// the lifetime of the temp dir (OS-managed) so the frontend can fetch them.
+func (an *Analyzer) imageDirForPath(audioPath string) string {
+	safe := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return '_'
+	}, filepath.Base(audioPath))
+	if len(safe) > 40 {
+		safe = safe[:40]
+	}
+	return filepath.Join(os.TempDir(), "phaselimiter_img_"+safe)
+}
+
+// AnalyzeAudioFull is like AnalyzeAudio but also runs audio_analyzer with image
+// output flags, populating TruePeak, LoudnessRange, Dynamics, Sharpness, Space,
+// SampleRate, Peak, and SpectrogramURL. Gracefully degrades: if image generation
+// fails the basic metrics are still returned.
+func (an *Analyzer) AnalyzeAudioFull(audioPath string) (*AnalysisResult, error) {
+	result, err := an.AnalyzeAudio(audioPath)
+	if err != nil {
+		return nil, err
+	}
+
+	pngDir := an.imageDirForPath(audioPath)
+	if mkErr := os.MkdirAll(pngDir, 0o755); mkErr != nil {
+		return result, nil
+	}
+
+	full, imgs, aerr := an.AnalyzeWithImages(audioPath, pngDir)
+	if aerr != nil {
+		return result, nil
+	}
+
+	// Overwrite bands from the authoritative AnalyzeWithImages run
+	result.Bands = nil
+	result.GlobalLoudness = full.Loudness
+	result.TruePeak = full.TruePeak
+	result.LoudnessRange = full.LoudnessRange
+	result.Dynamics = full.Dynamics
+	result.Sharpness = full.Sharpness
+	result.Space = full.Space
+	result.SampleRate = full.SampleRate
+	result.Peak = full.Peak
+	for _, b := range full.Bands {
+		result.Bands = append(result.Bands, BandSample{
+			LowFreq:  b.LowFreq,
+			HighFreq: b.HighFreq,
+			Loudness: b.Loudness,
+			MidMean:  b.MidMean,
+			SideMean: b.SideMean,
+		})
+	}
+	if imgs.Spectrogram != "" {
+		result.SpectrogramURL = "/local?path=" + url.QueryEscape(imgs.Spectrogram)
+	}
+	// Populate cache so subsequent Analyze() calls skip re-running audio_analyzer
+	an.mu.Lock()
+	an.cache[analyzeCacheKey(audioPath)] = full
+	an.mu.Unlock()
 	return result, nil
 }
 
