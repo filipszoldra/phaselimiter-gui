@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"runtime"
 	"sync"
 )
 
@@ -84,8 +85,12 @@ type Analyzer struct {
 // NewAnalyzer resolves the tool/resource paths relative to the GUI exe dir,
 // the same way mastering.go locates phase_limiter.
 func NewAnalyzer(execDir, ffmpeg string) *Analyzer {
+	audioAnalyzerBin := filepath.Join(execDir, "phaselimiter/bin/audio_analyzer")
+	if runtime.GOOS == "windows" {
+		audioAnalyzerBin += ".exe"
+	}
 	return &Analyzer{
-		AudioAnalyzerPath:  filepath.Join(execDir, "phaselimiter/bin/audio_analyzer"),
+		AudioAnalyzerPath:  audioAnalyzerBin,
 		Ffmpeg:             ffmpeg,
 		SoundQuality2Cache: filepath.Join(execDir, "phaselimiter/resource/sound_quality2_cache"),
 		AnalysisDataDir:    filepath.Join(execDir, "phaselimiter/resource/analysis_data"),
