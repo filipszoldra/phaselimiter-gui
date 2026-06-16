@@ -734,6 +734,20 @@ const AB_CW = AB_W - AB_PL - AB_PR;
 const AB_CH = AB_H - AB_PT - AB_PB;
 let AB_DB_MIN = -42, AB_DB_MAX = -4;
 
+function fmtHz(hz) {
+  if (hz >= 1000) return (hz / 1000).toFixed(hz < 10000 ? 1 : 0).replace(/\.0$/, "") + "k";
+  return Math.round(hz) + "";
+}
+// Representative center frequency for a band, derived from the analyzer's actual edges when
+// present (geometric mean, low edge floored at 20 Hz), else the canonical EQ_HZ fallback.
+function bandHzLabel(band, i) {
+  if (band && band.highFreq) {
+    const lo = band.lowFreq > 20 ? band.lowFreq : 20;
+    return fmtHz(Math.sqrt(lo * band.highFreq));
+  }
+  return EQ_HZ[i];
+}
+
 function abX(i) { return AB_PL + (i / 8) * AB_CW; }
 function abY(db) { return AB_PT + AB_CH * (1 - (db - AB_DB_MIN) / (AB_DB_MAX - AB_DB_MIN)); }
 function abDbFromY(y) {
@@ -870,13 +884,18 @@ function initAnalysisBandChart() {
     });
   });
 
-  // Band name labels
+  // Band name + representative frequency labels
   EQ_BANDS.forEach((label, i) => {
     const t = document.createElementNS(ns, "text");
-    t.setAttribute("x", abX(i)); t.setAttribute("y", AB_H - 3);
+    t.setAttribute("x", abX(i)); t.setAttribute("y", AB_H - 13);
     t.setAttribute("class", "ab-band-label");
     t.textContent = label;
     svg.appendChild(t);
+    const hz = document.createElementNS(ns, "text");
+    hz.setAttribute("x", abX(i)); hz.setAttribute("y", AB_H - 3);
+    hz.setAttribute("class", "ab-band-hz");
+    hz.textContent = bandHzLabel(bands[i], i);
+    svg.appendChild(hz);
   });
 
   container.appendChild(svg);

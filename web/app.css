@@ -231,6 +231,7 @@ details.eq-adv { margin-top: 10px; }
 .ab-guide { fill: none; stroke: var(--line-soft); stroke-width: 1; }
 .ab-scale { font-size: 9px; text-anchor: end; dominant-baseline: middle; fill: #4a5260; font-family: var(--font); pointer-events: none; }
 .ab-band-label { font-size: 9px; text-anchor: middle; dominant-baseline: auto; fill: var(--muted); font-family: var(--font); pointer-events: none; }
+.ab-band-hz { font-size: 7.5px; text-anchor: middle; dominant-baseline: auto; fill: #4a5260; font-family: var(--font); pointer-events: none; }
 .ab-curve-input  { fill: none; stroke: #e05555; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .ab-dot-input    { fill: #e05555; pointer-events: none; }
 .ab-curve-target { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
