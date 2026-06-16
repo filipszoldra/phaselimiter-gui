@@ -587,7 +587,7 @@ const AB_W = 320, AB_H = 160;
 const AB_PL = 34, AB_PR = 8, AB_PT = 10, AB_PB = 28;
 const AB_CW = AB_W - AB_PL - AB_PR;
 const AB_CH = AB_H - AB_PT - AB_PB;
-const AB_DB_MIN = -42, AB_DB_MAX = -4;
+let AB_DB_MIN = -42, AB_DB_MAX = -4;
 
 function abX(i) { return AB_PL + (i / 8) * AB_CW; }
 function abY(db) { return AB_PT + AB_CH * (1 - (db - AB_DB_MIN) / (AB_DB_MAX - AB_DB_MIN)); }
@@ -608,13 +608,18 @@ function initAnalysisBandChart() {
     return;
   }
 
+  // Dynamic Y range: fit the actual data with 3 dB margin, snapped to 5 dB grid
+  const minData = Math.min(...bands.map(b => b.loudness));
+  AB_DB_MIN = Math.floor((minData - 3) / 5) * 5;
+  AB_DB_MAX = -4;
+
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${AB_W} ${AB_H}`);
   svg.classList.add("ab-svg");
 
   // Y axis guide lines
-  [-40, -35, -30, -25, -20, -15, -10, -5].forEach(db => {
+  [-65, -60, -55, -50, -45, -40, -35, -30, -25, -20, -15, -10, -5].forEach(db => {
     if (db < AB_DB_MIN || db > AB_DB_MAX) return;
     const y = abY(db);
     const ln = document.createElementNS(ns, "line");
@@ -638,7 +643,7 @@ function initAnalysisBandChart() {
 
   redPts.forEach((p, i) => {
     const dot = document.createElementNS(ns, "circle");
-    dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y); dot.setAttribute("r", 4.5);
+    dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y); dot.setAttribute("r", 3);
     dot.setAttribute("class", "ab-dot-input");
     svg.appendChild(dot);
   });
@@ -654,7 +659,7 @@ function initAnalysisBandChart() {
 
   bands.forEach((_, i) => {
     const dot = document.createElementNS(ns, "circle");
-    dot.setAttribute("r", 5);
+    dot.setAttribute("r", 4);
     dot.setAttribute("class", "ab-dot-target" + (state.eqAnalysisEnabled ? "" : " hidden"));
     svg.appendChild(dot);
     _abBlueDots.push(dot);

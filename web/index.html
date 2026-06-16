@@ -98,7 +98,7 @@
         <summary>Advanced: per-band optimizer</summary>
         <div class="eq-block">
           <div class="eq-head">
-            <span>Per-band EQ <em class="muted">drag dots (0-2, 1 = neutral)</em></span>
+            <span>Per-band EQ <em class="muted">drag dots (0-2, 1 = neutral)</em> <button class="help" type="button" data-help="Each dot scales AutoMastering5 per frequency band. Above 1 = allow more processing in that band; below 1 = restrict it. Ceiling mode limits pumping; Transform mode adjusts tonal level. Double-click a dot to reset it.">?</button></span>
             <button id="eqReset" class="btn tiny">Reset</button>
           </div>
           <label class="field eq-mode-row">
@@ -142,7 +142,7 @@
 
     <!-- 4 PHASE LIMITER -->
     <section class="card">
-      <div class="card-head"><span class="step">4</span><h2>Phase limiter</h2><span class="muted">the crunch stage</span></div>
+      <div class="card-head"><span class="step">4</span><h2>Phase limiter <button class="help" type="button" data-help="Iterative FFT optimizer that limits peaks with minimal audible error. More iterations = fewer artifacts but slower. Oversampling reduces aliasing at cost of CPU/RAM. Raise quality to 200-400 for a final master.">?</button></h2><span class="muted">the crunch stage</span></div>
       <div class="grid2">
         <label class="field">
           <span>Oversampling</span>
@@ -170,8 +170,8 @@
 
     <!-- 6 SECTION-AWARE -->
     <section class="card">
-      <div class="card-head"><span class="step">6</span><h2>Section-aware mastering <button class="help" type="button" data-help="Detects quiet sections (intro, outro, breakdowns) and applies a gentler intensity to avoid over-compression in those parts. Uses crossfade to blend back into the main master.">?</button></h2><span class="muted">rescue quiet parts</span></div>
-      <label class="check"><input id="sectionEnable" type="checkbox" /> <span>Re-render quiet sections gently</span></label>
+      <div class="card-head"><span class="step">6</span><h2>Section-aware mastering <button class="help" type="button" data-help="In marked sections, the AutoMastering5 result is blended toward the dry (unprocessed) signal. Section intensity sets blend strength: 0 = fully dry, 1 = full processing. A 100ms raised-cosine ramp at each boundary prevents clicks.">?</button></h2><span class="muted">blend quiet parts</span></div>
+      <label class="check"><input id="sectionEnable" type="checkbox" /> <span>Blend quiet sections toward dry signal</span></label>
       <div id="sectionsChart"></div>
       <div id="secPlayRow" class="sec-play-row hidden">
         <span id="secPlayheadTime" class="muted">Click timeline to place playhead</span>
