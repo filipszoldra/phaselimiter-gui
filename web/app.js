@@ -203,13 +203,18 @@ async function fetchJobResult(j, node) {
   loadBar.innerHTML = '<div class="bar-indeterminate" style="margin:4px 0 0"></div>';
   node.appendChild(loadBar);
   try {
-    const result = await bridge.analyzeFull(j.output);
+    const [inResult, outResult] = await Promise.all([
+      bridge.analyzeFull(j.input),
+      bridge.analyzeFull(j.output),
+    ]);
     loadBar.remove();
-    if (!result) return;
+    if (!outResult) return;
     const panel = document.createElement("div");
     panel.className = "job-result";
-    panel.innerHTML = renderJobResultHTML(result);
+    panel.innerHTML = renderJobResultHTML(inResult, outResult);
     node.appendChild(panel);
+    renderJobCompareEQ(panel.querySelector(".jr-eq-canvas"), inResult, outResult);
+    renderJobCompareLoudness(panel.querySelector(".jr-loud-canvas"), inResult, outResult);
     panel.querySelector(".job-result-head").addEventListener("click", () => {
       const body = panel.querySelector(".job-result-body");
       const tog = panel.querySelector(".job-result-toggle");
@@ -222,28 +227,142 @@ async function fetchJobResult(j, node) {
   }
 }
 
-function renderJobResultHTML(result) {
-  const lufs = result.globalLoudness ? `${result.globalLoudness.toFixed(1)} LUFS` : "n/a";
-  const tp   = result.truePeak       ? `${result.truePeak.toFixed(1)} dBTP`       : "n/a";
-  const lra  = result.loudnessRange  ? `${result.loudnessRange.toFixed(1)} LU`    : "n/a";
-  const dur  = result.totalSec       ? fmtSec(result.totalSec)                    : "n/a";
-  const spectroHTML = result.spectrogramURL
-    ? `<img class="spectro" src="${result.spectrogramURL}" alt="Spectrogram" />`
-    : "";
+function renderJobResultHTML(inR, outR) {
+  const fmt1 = (v, unit) => v != null ? `${v.toFixed(1)}${unit}` : "n/a";
+  const delta = (a, b, unit) => {
+    if (a == null || b == null) return "";
+    const d = b - a;
+    const sign = d >= 0 ? "+" : "";
+    return `<span class="jr-delta ${d >= 0 ? "pos" : "neg"}">${sign}${d.toFixed(1)}${unit}</span>`;
+  };
+  const rows = [
+    ["LUFS",      fmt1(inR?.globalLoudness, ""),   fmt1(outR?.globalLoudness, ""),   delta(inR?.globalLoudness, outR?.globalLoudness, "")],
+    ["True-peak", fmt1(inR?.truePeak, " dBTP"),    fmt1(outR?.truePeak, " dBTP"),    ""],
+    ["LRA",       fmt1(inR?.loudnessRange, " LU"), fmt1(outR?.loudnessRange, " LU"), delta(inR?.loudnessRange, outR?.loudnessRange, " LU")],
+    ["Duration",  inR?.totalSec ? fmtSec(inR.totalSec) : "n/a", outR?.totalSec ? fmtSec(outR.totalSec) : "n/a", ""],
+  ];
+  const metricsHTML = `<table class="jr-metrics">
+    <tr><th></th><th class="jr-col-in">Input</th><th class="jr-col-out">Output</th><th></th></tr>
+    ${rows.map(([label, i, o, d]) => `<tr><td class="jr-label">${label}</td><td class="jr-val-in">${i}</td><td class="jr-val-out">${o}</td><td>${d}</td></tr>`).join("")}
+  </table>`;
+  const spectrosHTML = [
+    inR?.spectrogramURL  ? `<div class="jr-spectro-wrap"><span class="jr-spectro-label">Input</span><img class="spectro" src="${inR.spectrogramURL}" alt="Input spectrogram" /></div>`  : "",
+    outR?.spectrogramURL ? `<div class="jr-spectro-wrap"><span class="jr-spectro-label">Output</span><img class="spectro" src="${outR.spectrogramURL}" alt="Output spectrogram" /></div>` : "",
+  ].join("");
   return `
     <div class="job-result-head">
       <span class="job-result-toggle">+</span>
-      <span>Output analysis</span>
+      <span>Mastering comparison</span>
     </div>
     <div class="job-result-body hidden">
-      <div class="job-result-metrics">
-        <span>LUFS</span><strong>${lufs}</strong>
-        <span>True-peak</span><strong>${tp}</strong>
-        <span>LRA</span><strong>${lra}</strong>
-        <span>Duration</span><strong>${dur}</strong>
-      </div>
-      ${spectroHTML}
+      ${metricsHTML}
+      <div class="jr-chart-section"><span class="jr-chart-label">Per-band level</span><div class="jr-eq-canvas"></div></div>
+      <div class="jr-chart-section"><span class="jr-chart-label">Loudness over time</span><div class="jr-loud-canvas"></div></div>
+      ${spectrosHTML}
     </div>`;
+}
+
+function renderJobCompareEQ(container, inR, outR) {
+  if (!container) return;
+  const inBands  = inR?.bands  || inR?.analysisBands;
+  const outBands = outR?.bands || outR?.analysisBands;
+  if (!inBands?.length && !outBands?.length) { container.innerHTML = '<p class="muted" style="font-size:11px">No band data</p>'; return; }
+  const allBands = [...(inBands || []), ...(outBands || [])];
+  const allDb = allBands.map(b => b.loudness).filter(v => v != null);
+  const yMin = Math.floor((Math.min(...allDb) - 3) / 5) * 5;
+  const yMax = -4;
+  const W = 320, H = 110, PL = 32, PR = 6, PT = 8, PB = 22;
+  const CW = W - PL - PR, CH = H - PT - PB;
+  const xOf = i => PL + (i / 8) * CW;
+  const yOf = db => PT + CH * (1 - (db - yMin) / (yMax - yMin));
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.classList.add("ab-svg");
+  [-60,-50,-40,-30,-20,-10].forEach(db => {
+    if (db < yMin || db > yMax) return;
+    const y = yOf(db);
+    const ln = document.createElementNS(ns, "line");
+    ln.setAttribute("x1", PL); ln.setAttribute("x2", W - PR);
+    ln.setAttribute("y1", y); ln.setAttribute("y2", y);
+    ln.setAttribute("class", "ab-guide");
+    svg.appendChild(ln);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", PL - 3); t.setAttribute("y", y);
+    t.setAttribute("class", "ab-scale"); t.textContent = db;
+    svg.appendChild(t);
+  });
+  const drawLine = (bands, cls, dotCls, r) => {
+    if (!bands?.length) return;
+    const pts = bands.map((b, i) => `${xOf(i).toFixed(1)},${yOf(b.loudness).toFixed(1)}`).join(" ");
+    const pl = document.createElementNS(ns, "polyline");
+    pl.setAttribute("points", pts); pl.setAttribute("class", cls);
+    svg.appendChild(pl);
+    bands.forEach((b, i) => {
+      const c = document.createElementNS(ns, "circle");
+      c.setAttribute("cx", xOf(i)); c.setAttribute("cy", yOf(b.loudness)); c.setAttribute("r", r);
+      c.setAttribute("class", dotCls);
+      svg.appendChild(c);
+    });
+  };
+  drawLine(inBands,  "ab-curve-input",  "ab-dot-input",        2.5);
+  drawLine(outBands, "jr-curve-out",    "jr-dot-out",          2.5);
+  EQ_BANDS.forEach((label, i) => {
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", xOf(i)); t.setAttribute("y", H - 3);
+    t.setAttribute("class", "ab-band-label"); t.textContent = label;
+    svg.appendChild(t);
+  });
+  container.appendChild(svg);
+}
+
+function renderJobCompareLoudness(container, inR, outR) {
+  if (!container) return;
+  const inS  = inR?.loudnessSeries;
+  const outS = outR?.loudnessSeries;
+  if (!inS?.length && !outS?.length) { container.innerHTML = '<p class="muted" style="font-size:11px">No loudness data</p>'; return; }
+  const allSec = Math.max(inR?.totalSec || 0, outR?.totalSec || 0) || 210;
+  const allDb  = [...(inS||[]), ...(outS||[])].map(p => p.db).filter(v => v != null);
+  const yMin = Math.floor((Math.min(...allDb) - 2) / 5) * 5;
+  const yMax = Math.ceil((Math.max(...allDb) + 2) / 5) * 5;
+  const W = 320, H = 80, PL = 30, PR = 6, PT = 6, PB = 18;
+  const CW = W - PL - PR, CH = H - PT - PB;
+  const xOf = sec => PL + (sec / allSec) * CW;
+  const yOf = db  => PT + CH * (1 - (db - yMin) / (yMax - yMin));
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.classList.add("ab-svg");
+  [yMin, Math.round((yMin + yMax) / 2), yMax].forEach(db => {
+    const y = yOf(db);
+    const ln = document.createElementNS(ns, "line");
+    ln.setAttribute("x1", PL); ln.setAttribute("x2", W - PR);
+    ln.setAttribute("y1", y); ln.setAttribute("y2", y);
+    ln.setAttribute("class", "ab-guide"); svg.appendChild(ln);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", PL - 3); t.setAttribute("y", y);
+    t.setAttribute("class", "ab-scale"); t.textContent = db;
+    svg.appendChild(t);
+  });
+  const drawSeries = (series, cls) => {
+    if (!series?.length) return;
+    const pts = series.map(p => `${xOf(p.sec).toFixed(1)},${yOf(p.db).toFixed(1)}`).join(" ");
+    const pl = document.createElementNS(ns, "polyline");
+    pl.setAttribute("points", pts); pl.setAttribute("class", cls);
+    svg.appendChild(pl);
+  };
+  drawSeries(inS,  "jr-loud-in");
+  drawSeries(outS, "jr-loud-out");
+  [0, Math.round(allSec / 2), allSec].forEach(sec => {
+    const x = xOf(sec);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", x); t.setAttribute("y", H - 3);
+    t.setAttribute("class", "ab-band-label");
+    t.setAttribute("text-anchor", sec === 0 ? "start" : sec === allSec ? "end" : "middle");
+    t.textContent = fmtSec(sec);
+    svg.appendChild(t);
+  });
+  container.appendChild(svg);
 }
 
 function updateOverallProgress() {
