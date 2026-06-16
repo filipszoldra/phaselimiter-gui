@@ -326,6 +326,20 @@ function renderJobCompareEQ(container, inR, outR) {
   };
   drawLine(inBands,  "ab-curve-input",  "ab-dot-input",        2.5);
   drawLine(outBands, "jr-curve-out",    "jr-dot-out",          2.5);
+  // Per-band change (output - input) in dB, printed above each band
+  if (inBands?.length && outBands?.length) {
+    EQ_BANDS.forEach((_, i) => {
+      const iv = inBands[i]?.loudness, ov = outBands[i]?.loudness;
+      if (iv == null || ov == null) return;
+      const d = ov - iv;
+      const t = document.createElementNS(ns, "text");
+      t.setAttribute("x", xOf(i));
+      t.setAttribute("y", (Math.min(yOf(iv), yOf(ov)) - 4).toFixed(1));
+      t.setAttribute("class", "ab-delta " + (d >= 0 ? "pos" : "neg"));
+      t.textContent = (d >= 0 ? "+" : "") + d.toFixed(1);
+      svg.appendChild(t);
+    });
+  }
   EQ_BANDS.forEach((label, i) => {
     const t = document.createElementNS(ns, "text");
     t.setAttribute("x", xOf(i)); t.setAttribute("y", H - 3);
