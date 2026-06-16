@@ -22,6 +22,8 @@
     </div>
   </header>
 
+  <div id="analysisProgress" class="bar-indeterminate analysis-progress-top hidden"></div>
+
   <div id="progressStrip" class="progress-strip hidden">
     <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
     <span id="progressLabel" class="progress-label">Idle</span>
@@ -80,7 +82,6 @@
         </label>
       </div>
 
-      <div id="analysisProgress" class="bar-indeterminate hidden"></div>
       <div id="analysisBandChart">
         <p class="muted" style="font-size:12px;margin:16px 0">Add a file - analysis starts automatically.</p>
       </div>
@@ -89,7 +90,7 @@
           <input id="analysisEqEnable" type="checkbox" />
           <span>Enable EQ correction <em class="muted">(applied between automastering &amp; limiter)</em></span>
         </label>
-        <p id="analysisEqNote" class="muted" style="font-size:11px;margin:6px 0 0 25px">Blue = your target (drag per band). Red = your track. Applied as static gain after automastering.</p>
+        <p id="analysisEqNote" class="muted" style="font-size:11px;margin:6px 0 0 25px">Red = your track. Drag the pink curve per band (up to +/-12 dB) to set your EQ move. The dashed red curve and red fill show the predicted result (your move scaled by intensity, capped at +/-6 dB).</p>
       </div>
 
       <label class="check"><input id="preserveBass" type="checkbox" checked /> <span>Preserve bass <button class="help" type="button" data-help="Applies perceptual weighting that protects low-frequency content from limiter-induced bass reduction. Keep ON for most music.">?</button></span></label>
@@ -170,7 +171,7 @@
 
     <!-- 6 SECTION-AWARE -->
     <section class="card">
-      <div class="card-head"><span class="step">6</span><h2>Section-aware mastering <button class="help" type="button" data-help="In marked sections, the AutoMastering5 result is blended toward the dry (unprocessed) signal. Section intensity sets blend strength: 0 = fully dry, 1 = full processing. A 100ms raised-cosine ramp at each boundary prevents clicks.">?</button></h2><span class="muted">blend quiet parts</span></div>
+      <div class="card-head"><span class="step">6</span><h2>Section-aware mastering <button class="help" type="button" data-help="In marked sections, the AutoMastering5 result is blended toward the dry (unprocessed) signal. Section intensity sets blend strength: 0 = fully dry, 1 = full processing. A 1s raised-cosine ramp at each boundary prevents clicks.">?</button></h2><span class="muted">blend quiet parts</span></div>
       <label class="check"><input id="sectionEnable" type="checkbox" /> <span>Blend quiet sections toward dry signal</span></label>
       <div id="sectionsChart"></div>
       <div id="secPlayRow" class="sec-play-row hidden">
@@ -196,7 +197,7 @@
   <aside id="analysisDrawer" class="analysis-drawer hidden">
     <div class="drawer-head"><h2>Track analysis</h2><button id="analysisClose" class="btn ghost small">Close</button></div>
     <div id="analysisMetrics" class="ab-metrics hidden"></div>
-    <img id="analysisSpectro" class="spectro hidden" alt="Spectrogram" />
+    <div id="analysisSpectro" class="hidden"></div>
   </aside>
 
   <script src="app.js"></script>

@@ -32,7 +32,7 @@ const state = {
   jobs: new Map(),
   referenceProfile: null,    // RefProfile from plGetReference (9 bands from mastering_reference.json)
   analysisBands: null,       // BandSample[9] from last plAnalyze (null if audio_analyzer absent)
-  analysisTarget: null,      // [9] float64 dBFS — user's blue curve (null until EQ correction enabled)
+  analysisTarget: null,      // [9] per-band modification in dB (-12..+12, 0 = no change); null until EQ enabled
   eqAnalysisEnabled: false,  // whether EQ correction (--eq_analysis_target) will be sent to engine
 };
 
@@ -99,11 +99,9 @@ function collectSettings() {
     sectionIntensity: num("sectionIntensity"),
     sectionMasteringEnable: chk("sectionEnable"),
     eqAnalysisEnabled: state.eqAnalysisEnabled && !!state.analysisTarget && !!state.analysisBands,
-    // Send relative deltas (target - input per band) so the engine doesn't need audio_analyzer's
-    // absolute dBFS calibration to match; differences cancel any constant offset.
-    eqAnalysisTarget: (state.analysisTarget && state.analysisBands)
-      ? state.analysisTarget.map((t, i) => t - (state.analysisBands[i]?.loudness ?? 0))
-      : new Array(9).fill(0),
+    // analysisTarget IS the per-band modification (delta in dB). The engine scales it by
+    // intensity and clamps the applied change to +/-6 dB internally (auto_mastering5.cpp).
+    eqAnalysisTarget: state.analysisTarget ? state.analysisTarget.slice() : new Array(9).fill(0),
   };
 }
 
@@ -227,6 +225,28 @@ async function fetchJobResult(j, node) {
   }
 }
 
+const SPECTRO_HELP = "A spectrogram shows how the track's frequency content evolves over time: " +
+  "x = time (left to right), y = frequency (low at the bottom, high at the top), and brightness = " +
+  "how much energy is present at that frequency and moment. Frequency ticks are approximate.";
+
+// Wrap a spectrogram PNG with Time (x) / Frequency (y) axis labels and a help popover.
+function spectroFigureHTML(src, caption, durationSec) {
+  if (!src) return "";
+  const dur = durationSec ? fmtSec(durationSec) : "";
+  const help = caption ? "" : ` <button class="help" type="button" data-help="${SPECTRO_HELP}">?</button>`;
+  const head = caption
+    ? `<span class="spectro-title">${caption}</span>`
+    : `<span class="spectro-title">Spectrogram</span>${help}`;
+  return `<figure class="spectro-fig">
+      <div class="spectro-head">${head}</div>
+      <div class="spectro-body">
+        <div class="spectro-yaxis"><span>20k</span><span>5k</span><span>1k</span><span>0&#8201;Hz</span></div>
+        <img class="spectro" src="${src}" alt="Spectrogram${caption ? " " + caption : ""}" />
+      </div>
+      <div class="spectro-xaxis"><span>0:00</span><span>Time</span><span>${dur}</span></div>
+    </figure>`;
+}
+
 function renderJobResultHTML(inR, outR) {
   const fmt1 = (v, unit) => v != null ? `${v.toFixed(1)}${unit}` : "n/a";
   const delta = (a, b, unit) => {
@@ -239,15 +259,14 @@ function renderJobResultHTML(inR, outR) {
     ["LUFS",      fmt1(inR?.globalLoudness, ""),   fmt1(outR?.globalLoudness, ""),   delta(inR?.globalLoudness, outR?.globalLoudness, "")],
     ["True-peak", fmt1(inR?.truePeak, " dBTP"),    fmt1(outR?.truePeak, " dBTP"),    ""],
     ["LRA",       fmt1(inR?.loudnessRange, " LU"), fmt1(outR?.loudnessRange, " LU"), delta(inR?.loudnessRange, outR?.loudnessRange, " LU")],
-    ["Duration",  inR?.totalSec ? fmtSec(inR.totalSec) : "n/a", outR?.totalSec ? fmtSec(outR.totalSec) : "n/a", ""],
   ];
   const metricsHTML = `<table class="jr-metrics">
     <tr><th></th><th class="jr-col-in">Input</th><th class="jr-col-out">Output</th><th></th></tr>
     ${rows.map(([label, i, o, d]) => `<tr><td class="jr-label">${label}</td><td class="jr-val-in">${i}</td><td class="jr-val-out">${o}</td><td>${d}</td></tr>`).join("")}
   </table>`;
   const spectrosHTML = [
-    inR?.spectrogramURL  ? `<div class="jr-spectro-wrap"><span class="jr-spectro-label">Input</span><img class="spectro" src="${inR.spectrogramURL}" alt="Input spectrogram" /></div>`  : "",
-    outR?.spectrogramURL ? `<div class="jr-spectro-wrap"><span class="jr-spectro-label">Output</span><img class="spectro" src="${outR.spectrogramURL}" alt="Output spectrogram" /></div>` : "",
+    spectroFigureHTML(inR?.spectrogramURL,  "Input",  inR?.totalSec),
+    spectroFigureHTML(outR?.spectrogramURL, "Output", outR?.totalSec),
   ].join("");
   return `
     <div class="job-result-head">
@@ -258,7 +277,7 @@ function renderJobResultHTML(inR, outR) {
       ${metricsHTML}
       <div class="jr-chart-section"><span class="jr-chart-label">Per-band level</span><div class="jr-eq-canvas"></div></div>
       <div class="jr-chart-section"><span class="jr-chart-label">Loudness over time</span><div class="jr-loud-canvas"></div></div>
-      ${spectrosHTML}
+      ${spectrosHTML ? `<div class="jr-chart-section"><span class="jr-chart-label">Spectrogram <button class="help" type="button" data-help="${SPECTRO_HELP}">?</button></span>${spectrosHTML}</div>` : ""}
     </div>`;
 }
 
@@ -709,6 +728,15 @@ function abDbFromY(y) {
 }
 
 let _abBlueDots = [], _abBlueLine = null, _abDeltaLabels = [], _abBlueHits = [];
+let _abPredictLine = null, _abPredictFill = null;
+
+// Predicted applied change per band: modification * intensity, clamped to +/-6 dB (mirrors the
+// engine's clamp((delta - normalized_change) * mastering_level, -6, +6) in auto_mastering5.cpp).
+function abPredictDb(i) {
+  const mod = state.analysisTarget?.[i] ?? 0;
+  const intensity = num("intensity");
+  return Math.max(-6, Math.min(6, mod * intensity));
+}
 
 function initAnalysisBandChart() {
   const container = el("analysisBandChart");
@@ -717,10 +745,14 @@ function initAnalysisBandChart() {
   if (!bands || !bands.length) {
     container.innerHTML = '<p class="muted" style="font-size:12px;margin:16px 0">No per-band data — audio_analyzer not available.</p>';
     _abBlueDots = []; _abBlueLine = null; _abDeltaLabels = []; _abBlueHits = [];
+    _abPredictLine = null; _abPredictFill = null;
     return;
   }
 
-  // Dynamic Y range: fit the actual data with 3 dB margin, snapped to 5 dB grid
+  // Modifications default to 0 (neutral) unless the user already set some this session.
+  if (!state.analysisTarget) state.analysisTarget = bands.map(() => 0);
+
+  // Dynamic Y range: fit input + max boost headroom with 3 dB margin, snapped to 5 dB grid
   const minData = Math.min(...bands.map(b => b.loudness));
   AB_DB_MIN = Math.floor((minData - 3) / 5) * 5;
   AB_DB_MAX = -4;
@@ -760,7 +792,18 @@ function initAnalysisBandChart() {
     svg.appendChild(dot);
   });
 
-  // Blue target polyline (hidden until EQ enabled)
+  // Predicted-effect fill + dashed curve (red), drawn under the pink target line.
+  const predictFill = document.createElementNS(ns, "path");
+  predictFill.setAttribute("class", "ab-predict-fill" + (state.eqAnalysisEnabled ? "" : " hidden"));
+  svg.appendChild(predictFill);
+  _abPredictFill = predictFill;
+
+  const predictLine = document.createElementNS(ns, "polyline");
+  predictLine.setAttribute("class", "ab-curve-predict" + (state.eqAnalysisEnabled ? "" : " hidden"));
+  svg.appendChild(predictLine);
+  _abPredictLine = predictLine;
+
+  // Pink target polyline (= input + modification; hidden until EQ enabled)
   const blueLine = document.createElementNS(ns, "polyline");
   blueLine.setAttribute("class", "ab-curve-target" + (state.eqAnalysisEnabled ? "" : " hidden"));
   svg.appendChild(blueLine);
@@ -797,15 +840,17 @@ function initAnalysisBandChart() {
       if (!dragging || !state.analysisTarget) return;
       const rect = svg.getBoundingClientRect();
       const rawY = (e.clientY - rect.top) / rect.height * AB_H;
-      const newDb = Math.round(abDbFromY(rawY) * 10) / 10;
-      if (state.analysisTarget[i] === newDb) return;
-      state.analysisTarget[i] = newDb;
+      // Pink dot sits at input + modification; the dragged absolute level minus input = modification.
+      const inputDb = state.analysisBands[i].loudness;
+      const newMod = Math.max(-12, Math.min(12, Math.round((abDbFromY(rawY) - inputDb) * 10) / 10));
+      if (state.analysisTarget[i] === newMod) return;
+      state.analysisTarget[i] = newMod;
       updateAnalysisBandChart();
     });
     hit.addEventListener("pointerup", () => { dragging = false; dot.classList.remove("active"); });
     hit.addEventListener("dblclick", () => {
-      if (state.analysisTarget && state.referenceProfile?.bands?.[i]) {
-        state.analysisTarget[i] = state.referenceProfile.bands[i].loudness;
+      if (state.analysisTarget) {
+        state.analysisTarget[i] = 0;  // reset band to neutral (no modification)
         updateAnalysisBandChart();
       }
     });
@@ -826,33 +871,51 @@ function initAnalysisBandChart() {
 
 function updateAnalysisBandChart() {
   if (!_abBlueLine) return;
-  const target = state.analysisTarget;
-  const bands  = state.analysisBands;
-  const show   = state.eqAnalysisEnabled && !!target;
+  const mods  = state.analysisTarget;
+  const bands = state.analysisBands;
+  const show  = state.eqAnalysisEnabled && !!mods;
 
   const toggleClass = (el, cls, show) => {
     if (show) el.classList.remove(cls); else el.classList.add(cls);
   };
   toggleClass(_abBlueLine, "hidden", show);
+  toggleClass(_abPredictLine, "hidden", show);
+  toggleClass(_abPredictFill, "hidden", show);
   _abBlueDots.forEach(d => toggleClass(d, "hidden", show));
   _abDeltaLabels.forEach(d => toggleClass(d, "hidden", show));
   _abBlueHits.forEach(d => toggleClass(d, "hidden", show));
 
-  if (!show || !target || !bands) return;
+  if (!show || !mods || !bands) return;
 
-  const bluePts = target.map((db, i) => ({ x: abX(i), y: abY(db) }));
-  _abBlueLine.setAttribute("points", bluePts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "));
+  // Pink = input + modification (at rest mods are 0, so pink lies on the red input curve).
+  const pinkPts    = bands.map((b, i) => ({ x: abX(i), y: abY(b.loudness + mods[i]) }));
+  const inputPts   = bands.map((b, i) => ({ x: abX(i), y: abY(b.loudness) }));
+  // Dashed red = input + predicted applied change (modification * intensity, clamped +/-6 dB).
+  const predictPts = bands.map((b, i) => ({ x: abX(i), y: abY(b.loudness + abPredictDb(i)) }));
 
-  bluePts.forEach((p, i) => {
+  _abBlueLine.setAttribute("points", pinkPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "));
+  _abPredictLine.setAttribute("points", predictPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "));
+
+  // Red fill band between predicted curve (top) and input curve (bottom), closed polygon.
+  const fillD = "M " + predictPts.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" L ")
+    + " L " + inputPts.slice().reverse().map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" L ")
+    + " Z";
+  _abPredictFill.setAttribute("d", fillD);
+
+  pinkPts.forEach((p, i) => {
     _abBlueDots[i].setAttribute("cx", p.x); _abBlueDots[i].setAttribute("cy", p.y);
     _abBlueHits[i].setAttribute("cx", p.x); _abBlueHits[i].setAttribute("cy", p.y);
 
-    const deltaDb = target[i] - bands[i].loudness;
+    const mod = mods[i];
     const lbl = _abDeltaLabels[i];
-    lbl.setAttribute("x", p.x);
-    lbl.setAttribute("y", (Math.min(p.y, abY(bands[i].loudness)) - 5).toFixed(1));
-    lbl.textContent = (deltaDb >= 0 ? "+" : "") + deltaDb.toFixed(1);
-    lbl.setAttribute("class", "ab-delta " + (deltaDb >= 0 ? "pos" : "neg"));
+    if (Math.abs(mod) >= 0.05) {
+      lbl.setAttribute("x", p.x);
+      lbl.setAttribute("y", (Math.min(p.y, abY(bands[i].loudness)) - 5).toFixed(1));
+      lbl.textContent = (mod >= 0 ? "+" : "") + mod.toFixed(1);
+      lbl.setAttribute("class", "ab-delta " + (mod >= 0 ? "pos" : "neg"));
+    } else {
+      lbl.setAttribute("class", "ab-delta hidden");
+    }
   });
 }
 
@@ -1249,12 +1312,13 @@ function renderAnalysisDrawer(result) {
     metricsEl.classList.add("hidden");
   }
 
-  // Spectrogram image
+  // Spectrogram with axis labels + help
   const spectroEl = el("analysisSpectro");
   if (result.spectrogramURL) {
-    spectroEl.src = result.spectrogramURL;
+    spectroEl.innerHTML = spectroFigureHTML(result.spectrogramURL, "", result.totalSec);
     spectroEl.classList.remove("hidden");
   } else {
+    spectroEl.innerHTML = "";
     spectroEl.classList.add("hidden");
   }
 
@@ -1319,12 +1383,17 @@ async function init() {
     state.eqBands = state.eqBands.map(() => 1);
     updateEQ();
   });
+  // Intensity drives the per-band optimizer curve and the EQ predicted-effect overlay.
+  el("intensity").addEventListener("input", () => {
+    if (_eqPathEl) updateEQ();
+    if (_abBlueLine) updateAnalysisBandChart();
+  });
   el("analysisToggle").addEventListener("click", () => el("analysisDrawer").classList.toggle("hidden"));
   el("analysisClose").addEventListener("click", () => el("analysisDrawer").classList.add("hidden"));
   el("analysisEqEnable").addEventListener("change", (e) => {
     state.eqAnalysisEnabled = e.target.checked;
-    if (e.target.checked && !state.analysisTarget && state.referenceProfile) {
-      state.analysisTarget = state.referenceProfile.bands.map(b => b.loudness);
+    if (e.target.checked && !state.analysisTarget) {
+      state.analysisTarget = new Array(9).fill(0);  // start neutral (no modification)
     }
     updateAnalysisBandChart();
   });

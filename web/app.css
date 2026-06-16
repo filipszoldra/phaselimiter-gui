@@ -234,6 +234,8 @@ details.eq-adv { margin-top: 10px; }
 .ab-curve-input  { fill: none; stroke: #e05555; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .ab-dot-input    { fill: #e05555; pointer-events: none; }
 .ab-curve-target { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.ab-curve-predict { fill: none; stroke: #e05555; stroke-width: 1.5; stroke-dasharray: 5 3; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+.ab-predict-fill { stroke: none; fill: #e05555; opacity: 0.2; pointer-events: none; }
 .ab-dot-target   { fill: var(--accent); stroke: #2a0f20; stroke-width: 1.5; pointer-events: none; }
 .ab-dot-target.active { fill: var(--accent-soft); }
 .ab-dot-hit      { fill: rgba(0,0,0,0); cursor: ns-resize; }
@@ -277,6 +279,10 @@ details.eq-adv { margin-top: 10px; }
 .bar-indeterminate {
   height: 4px; background: var(--bg-2); border-radius: 99px;
   overflow: hidden; margin-bottom: 10px;
+}
+/* Analysis progress as a thin full-width strip at the very top of the window */
+.analysis-progress-top {
+  margin-bottom: 0; border-radius: 0; height: 3px; flex: 0 0 auto;
 }
 .bar-indeterminate::after {
   content: ""; display: block; height: 100%; width: 38%;
@@ -322,6 +328,17 @@ details.eq-adv { margin-top: 10px; }
 .jr-loud-in    { fill: none; stroke: #e05555; stroke-width: 1; opacity: 0.6; stroke-linejoin: round; }
 .jr-loud-out   { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
 
-/* ---------- spectrogram image ---------- */
-.spectro { display: block; width: 100%; border-radius: 6px; margin-top: 10px; }
-#analysisSpectro { height: 160px; object-fit: fill; }
+/* ---------- spectrogram figure (image + axis labels) ---------- */
+.spectro { display: block; width: 100%; border-radius: 6px; }
+.spectro-fig { margin: 8px 0 0; }
+.spectro-head { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+.spectro-body { display: flex; align-items: stretch; gap: 4px; }
+.spectro-yaxis { display: flex; flex-direction: column; justify-content: space-between;
+  font-size: 8px; color: #4a5260; text-align: right; padding: 1px 0; flex: 0 0 auto; min-width: 22px; }
+.spectro-body .spectro { flex: 1 1 auto; height: 150px; object-fit: fill; }
+.spectro-xaxis { display: flex; justify-content: space-between; font-size: 8px; color: #4a5260;
+  margin: 2px 0 0 26px; }
+.spectro-xaxis span:nth-child(2) { color: var(--muted); }
+/* drawer spectrogram a bit taller */
+#analysisSpectro .spectro-body .spectro { height: 170px; }
