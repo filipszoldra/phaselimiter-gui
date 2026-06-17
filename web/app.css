@@ -343,3 +343,18 @@ details.eq-adv { margin-top: 10px; }
 .spectro-xaxis span:nth-child(2) { color: var(--muted); }
 /* drawer spectrogram a bit taller */
 #analysisSpectro .spectro-body .spectro { height: 170px; }
+.spectro-body .spectro { cursor: zoom-in; }
+.spectro-zoom { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--muted);
+  border-radius: 5px; font-size: 12px; line-height: 1; padding: 2px 6px; cursor: pointer; }
+.spectro-zoom:hover { color: var(--text); border-color: var(--muted); }
+
+/* full-window spectrogram lightbox */
+#spectroLightbox { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center;
+  justify-content: center; background: rgba(0,0,0,.85); padding: 32px; cursor: zoom-out; }
+#spectroLightbox.hidden { display: none; }
+#spectroLightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.6); cursor: default; }
+#spectroLightboxClose { position: absolute; top: 16px; right: 20px; width: 36px; height: 36px;
+  border-radius: 50%; border: 1px solid var(--line); background: var(--bg-2); color: var(--text);
+  font-size: 20px; line-height: 1; cursor: pointer; }
+#spectroLightboxClose:hover { background: var(--bg-1); }

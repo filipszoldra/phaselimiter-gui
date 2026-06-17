@@ -7,14 +7,32 @@
 // ---------------------------------------------------------------------------
 const HAS_GO = typeof window.plStartMastering === "function";
 
+// Analysis runs in a Go goroutine (the WebView2 UI thread invokes bound functions
+// synchronously, so a blocking analyze would freeze the window). The bound function
+// is fire-and-forget: we hand it a request id, and Go resolves the matching promise
+// later via window.__plAnalyzeResolve. This keeps every `await bridge.analyze*` site working.
+let _analyzeSeq = 0;
+const _analyzePending = new Map();
+window.__plAnalyzeResolve = (id, result, err) => {
+  const p = _analyzePending.get(id);
+  if (!p) return;
+  _analyzePending.delete(id);
+  err ? p.reject(new Error(err)) : p.resolve(result);
+};
+const wrapAnalyze = (fn) => (path) => new Promise((resolve, reject) => {
+  const id = ++_analyzeSeq;
+  _analyzePending.set(id, { resolve, reject });
+  fn(id, path);
+});
+
 const bridge = {
   pickInputFiles: HAS_GO ? window.plPickInputFiles : async () =>
     ["C:\\Music\\demo track.wav", "C:\\Music\\second take.mp3"],
   pickOutputDir: HAS_GO ? window.plPickOutputDir : async () => "C:\\Users\\you\\Downloads",
   defaultOutputDir: HAS_GO ? window.plDefaultOutputDir : async () => "C:\\Users\\you\\Downloads",
   startMastering: HAS_GO ? window.plStartMastering : mockStartMastering,
-  analyze: typeof window.plAnalyze === "function" ? window.plAnalyze : mockAnalyze,
-  analyzeFull: typeof window.plAnalyzeFull === "function" ? window.plAnalyzeFull : mockAnalyzeFull,
+  analyze: typeof window.plAnalyze === "function" ? wrapAnalyze(window.plAnalyze) : mockAnalyze,
+  analyzeFull: typeof window.plAnalyzeFull === "function" ? wrapAnalyze(window.plAnalyzeFull) : mockAnalyzeFull,
   getReference: typeof window.plGetReference === "function" ? window.plGetReference : mockGetReference,
 };
 
@@ -234,9 +252,8 @@ function spectroFigureHTML(src, caption, durationSec) {
   if (!src) return "";
   const dur = durationSec ? fmtSec(durationSec) : "";
   const help = caption ? "" : ` <button class="help" type="button" data-help="${SPECTRO_HELP}">?</button>`;
-  const head = caption
-    ? `<span class="spectro-title">${caption}</span>`
-    : `<span class="spectro-title">Spectrogram</span>${help}`;
+  const head = `<span class="spectro-title">${caption || "Spectrogram"}</span>${help}`
+    + ` <button class="spectro-zoom" type="button" title="Enlarge">⤢</button>`;
   return `<figure class="spectro-fig">
       <div class="spectro-head">${head}</div>
       <div class="spectro-body">
@@ -1384,6 +1401,34 @@ function setupHelp() {
   });
 }
 
+// Spectrogram lightbox: click a spectrogram (or its enlarge button) to view the
+// native-resolution PNG full-window. Close via backdrop, the close button, or Esc.
+function setupSpectroLightbox() {
+  const box = el("spectroLightbox");
+  if (!box) return;
+  const img = box.querySelector("img");
+  const open = (src, alt) => {
+    img.src = src;
+    img.alt = alt || "Spectrogram (full size)";
+    box.classList.remove("hidden");
+  };
+  const close = () => { box.classList.add("hidden"); img.removeAttribute("src"); };
+
+  document.addEventListener("click", (e) => {
+    const fig = e.target.closest(".spectro-fig");
+    if (fig && (e.target.closest(".spectro-zoom") || e.target.matches(".spectro-body img.spectro"))) {
+      const figImg = fig.querySelector(".spectro-body img.spectro");
+      if (figImg && figImg.src) open(figImg.src, figImg.alt);
+      return;
+    }
+    // Click on backdrop or close button dismisses
+    if (e.target === box || e.target.id === "spectroLightboxClose") close();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !box.classList.contains("hidden")) close();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Wire up
 // ---------------------------------------------------------------------------
@@ -1399,6 +1444,7 @@ async function init() {
   setupReadouts();
   setupDnd();
   setupHelp();
+  setupSpectroLightbox();
   initEQ();
   setupEQModes();
   el("addFilesBtn").addEventListener("click", addFiles);

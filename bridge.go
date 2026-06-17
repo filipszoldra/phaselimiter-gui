@@ -81,26 +81,46 @@ type StartReq struct {
 func (app *App) pickInputFiles() ([]string, error) { return selectAudioFiles() }
 func (app *App) pickOutputDir() (string, error)    { return selectDirectory() }
 
-func (app *App) analyze(input string) (*AnalysisResult, error) {
-	log.Printf("analyze: input=%q ffmpeg=%q", input, app.analyzer.Ffmpeg)
-	result, err := app.analyzer.AnalyzeAudio(input)
-	if err != nil {
-		log.Printf("analyze error: %v", err)
-	} else {
-		log.Printf("analyze ok: %.0fs, %d samples, %d sections", result.TotalSec, len(result.LoudnessSeries), len(result.Sections))
-	}
-	return result, err
+// analyze / analyzeFull are fire-and-forget: they run the heavy analysis in a
+// goroutine so the WebView2 UI thread (which invokes bound functions synchronously)
+// is never blocked. The result is pushed back to the page via emitAnalyzeResult,
+// correlated to the JS caller by id. See web/app.js (__plAnalyzeResolve).
+func (app *App) analyze(id float64, input string) {
+	go func() {
+		log.Printf("analyze: input=%q ffmpeg=%q", input, app.analyzer.Ffmpeg)
+		result, err := app.analyzer.AnalyzeAudio(input)
+		if err != nil {
+			log.Printf("analyze error: %v", err)
+		} else {
+			log.Printf("analyze ok: %.0fs, %d samples, %d sections", result.TotalSec, len(result.LoudnessSeries), len(result.Sections))
+		}
+		app.emitAnalyzeResult(int(id), result, err)
+	}()
 }
 
-func (app *App) analyzeFull(input string) (*AnalysisResult, error) {
-	log.Printf("analyzeFull: input=%q", input)
-	result, err := app.analyzer.AnalyzeAudioFull(input)
+func (app *App) analyzeFull(id float64, input string) {
+	go func() {
+		log.Printf("analyzeFull: input=%q", input)
+		result, err := app.analyzer.AnalyzeAudioFull(input)
+		if err != nil {
+			log.Printf("analyzeFull error: %v", err)
+		} else {
+			log.Printf("analyzeFull ok: %.0fs, LUFS=%.1f, spectro=%q", result.TotalSec, result.GlobalLoudness, result.SpectrogramURL)
+		}
+		app.emitAnalyzeResult(int(id), result, err)
+	}()
+}
+
+// emitAnalyzeResult pushes an analysis result (or error) to the page, resolving the
+// JS-side promise keyed by id. Mirrors the plOnJobUpdate emit pattern.
+func (app *App) emitAnalyzeResult(id int, result *AnalysisResult, err error) {
+	res, errJSON := []byte("null"), []byte("null")
 	if err != nil {
-		log.Printf("analyzeFull error: %v", err)
+		errJSON, _ = json.Marshal(err.Error())
 	} else {
-		log.Printf("analyzeFull ok: %.0fs, LUFS=%.1f, spectro=%q", result.TotalSec, result.GlobalLoudness, result.SpectrogramURL)
+		res, _ = json.Marshal(result)
 	}
-	return result, err
+	app.emit(fmt.Sprintf("window.__plAnalyzeResolve(%d,%s,%s)", id, res, errJSON))
 }
 
 // startMastering builds one Mastering job per input, enqueues them, and returns
