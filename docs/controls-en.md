@@ -1,182 +1,136 @@
 # phaselimiter-gui — controls reference (EN)
 
 Guide to mastering settings and their effect on the audio.
-The **Advanced** section targets glitch reduction — crunch, pumping, true-peak clicks, smearing —
+The **Advanced** controls target glitch reduction — crunch, pumping, true-peak clicks, smearing —
 that persists even at gentle loudness and intensity.
 
 > **Quick summary.** Hearing crunch at `-13 LUFS` / intensity `0.4`?
 > That's not loudness — it's the **limiter**, **ceiling** and **pre-compression** stages.
-> Fix them in the Advanced section before touching Target loudness.
+> Fix them before touching Target loudness.
+
+Controls map to numbered cards in the UI. Each engine flag is shown so the console build
+(`phaselimiter-gui-console.exe`) output is easy to read.
 
 ---
 
-## Basic controls
-
-### Output directory
-Folder where mastered files are saved (defaults to `Downloads` / `Desktop`).
-Output files get the suffix `_output.wav`.
+## 1 · Loudness
 
 ### Target loudness → `--reference`
-**Range:** −20 … 0 LUFS · **Default:** −9 LUFS
+**Range:** −20 … 0 LUFS · **Default:** −14 LUFS
 
 The biggest lever. Sets how loud the track is pushed before the limiter.
-Lower (e.g. `−13` / `−14`) = less gain into the limiter = less crunch and pumping.
-**Recommended −12 to −14** for music with preserved dynamics.
+Lower (e.g. `−14`) = less gain into the limiter = less crunch and pumping.
+**Recommended −9 to −14.**
 
-### Mastering intensity → `--mastering5_mastering_level`
-**Range:** 0.0 … 1.0 · **Default:** 1.0
+## 2 · AutoMastering5 (tone & stereo)
 
-Controls how strongly AutoMastering5 reshapes the tone toward the learned reference
-(per-band M/S compressor, tuned by differential-evolution optimisation).
-Lower = gentler, closer to the original.
+### Intensity → `--mastering5_mastering_level`
+**Range:** 0.0 … 1.0 · **Default:** 0.4
 
-### Preserve bass → `--erb_eval_func_weighting`
-Enables perceptual weighting in the limiter to protect low frequencies from over-limiting.
+How strongly AutoMastering5 reshapes the tone toward the learned reference (per-band M/S
+compressor tuned by differential-evolution optimisation). Lower = gentler, closer to the original.
+**Recommended 0.3–0.5.**
 
----
-
-## Advanced — glitch reduction
-
-These stages run **independently** of loudness and intensity — they can degrade the sound
-even at gentle basic settings.
-
-### Limiter only (diagnostic) → `--mastering false`
-**Default:** off
-
-Skips AutoMastering5 and runs only the limiter. Use for A/B diagnosis: if quiet sections
-stop distorting with this on, the global reference-matching is the culprit — lower
-**Mastering intensity** (e.g. to 0.2–0.3). Not a production mode.
-
-### True-peak ceiling (dB) → `--ceiling`
-**Range:** −3.0 … 0.0 dB · **Default:** −1.0 dB
-
-Maximum inter-sample peak level. At `0 dB` peaks can exceed 0 dBFS after MP3/AAC encoding
-and produce audible **clicks**. Setting **−1.0 dB** provides headroom and eliminates most.
-
-### Limiter oversampling (×) → `--limiter_internal_oversample`
-**Options:** 1 / 2 / 4 · **Default:** 1
-
-Hard limiting at 44.1 kHz creates aliasing (harsh **crunch**). Running at `2×` or `4×`
-removes most of it. **Recommended 2×**. CPU/RAM cost scales with the factor.
-
-### Limiter quality (iterations) → `--max_iter1`
-**Range:** 100 … 400 (step 50) · **Default:** 100
-
-The limiter is an iterative FISTA optimizer. Too few iterations = audible error (crunch)
-and pre-ringing (transient smearing). **Try 200** if you hear distortion.
-
-### Pre-compression → `--pre_compression`
-**Default:** on
-
-Loudness-domain compressor running **before** the limiter. Evens out the loudest moments.
-Can be the source of **pumping**. Uncheck to preserve full dynamics.
-
-### Pre-comp threshold (dB) → `--pre_compression_threshold`
-**Range:** 0 … 18 dB · **Default:** 6 dB
-
-How many dB above measured loudness the pre-compressor activates.
-Higher = activates less often = more dynamics, less pumping.
-
-### Pre-comp window (s) → `--pre_compression_mean_sec`
-**Range:** 0.05 … 1.0 s · **Default:** 0.2 s
-
-Averaging window length. **Extending to ~0.4 s** smooths the action and reduces pumping.
-
-### Stereo match strength → `--mastering_ms_matching_level`
+### Stereo match → `--mastering_ms_matching_level`
 **Range:** 0 … 1 · **Default:** 1.0
 
-Controls how strongly AutoMastering5 reshapes the stereo field (M/S balance) toward the
-reference. At `1.0` it fully matches the reference's stereo width per band. Lowering to
-`0.5`–`0.7` preserves more of the original stereo image and reduces over-widening of hihats
-or spatial smearing on sparse material.
+How strongly the stereo field (M/S balance) is matched to the reference. Lowering to `0.5`–`0.7`
+preserves more of the original stereo image and reduces over-widening of hihats / spatial smear.
 
-### Per-band boost limit → `--mastering5_eq_band_levels`
-**Range:** 0.0 … 2.0 per band · **Default:** 1.0 (neutral)
+### EQ correction (per-band target) → `--eq_analysis_target`
+Enable **"EQ correction"** to drag a per-band **pink curve** (±12 dB) over the analyzed spectrum.
+The value you set is your per-band **modification**; a **dashed-red curve + red fill** show the
+**predicted applied change** = `modification × intensity`, **capped at ±6 dB** (the engine clamps
+it). Move the intensity slider and the prediction updates live.
 
-Nine spinbuttons — one per engine frequency band — scaling the AutoMastering5 optimizer's
-**wet-gain upper bound** for that band (mid + side). Values < 1 reduce how much the AI is
-allowed to boost or widen that band; > 1 permit more. The constraint is soft (a penalty
-in the optimizer's cost function), so the effect is proportional rather than a hard clip.
+The engine applies this as a static per-band gain **after** AutoMastering5 and **before**
+pre-compression. The GUI sends the modification array directly; intensity scaling and the ±6 dB
+clamp happen inside the engine. Frequency labels under each band show the band's center.
 
-| Band | Frequency range | Typical use |
+> Over-boosting an empty band (e.g. +12 dB Air on a track with little high content) fights the
+> limiter and can worsen artifacts. Use the before/after comparison to check.
+
+### Preserve bass → `--erb_eval_func_weighting`
+Perceptual weighting in the limiter that protects low frequencies from over-limiting. Keep on.
+
+### Limiter only (diagnostic) → `--mastering false`
+Skips AutoMastering5 and runs only the limiter. A/B test: if quiet sections stop distorting with
+this on, the reference-matching is the culprit — lower Intensity. Not a production mode.
+
+### Advanced: per-band optimizer → `--mastering5_eq_band_levels` / `--mastering5_eq_transform_levels`
+A 9-band curve (0–2, **1 = neutral**) restraining how aggressively AutoMastering5 reshapes each
+band. **Ceiling** mode (`--mastering5_eq_band_levels`) scales the optimizer's wet-gain upper
+bound (soft penalty, proportional). **Transform** mode (`--mastering5_eq_transform_levels`) scales
+the realized wet-gain after optimization (deterministic). The "Parameter affects" selector and
+per-band overrides choose which mode each band uses; **Symmetric transform** also scales cuts.
+
+| Band | Frequency | Lower it when |
 |---|---|---|
-| Sub | 0–148 Hz | leave at 1.0 unless bass is deformed |
-| Low | 148–392 Hz | reduce if kick body gets pumped |
-| Low-mid | 392–795 Hz | |
-| Mid | 795–1458 Hz | |
-| Upper-mid | 1458–2550 Hz | |
-| Presence | 2550–4349 Hz | reduce if vocals become harsh |
-| High | 4349–7314 Hz | reduce if cymbals are over-brightened |
-| Very-high | 7314–12k Hz | reduce if hihats smear / over-widen |
-| Air | 12k+ Hz | reduce on tracks with sparse highs |
+| Sub | ~54 Hz | bass is deformed |
+| Low | ~240 Hz | kick body gets pumped |
+| Lo-mid | ~560 Hz | |
+| Mid | ~1.1k | |
+| Up-mid | ~1.9k | |
+| Pres | ~3.3k | vocals get harsh |
+| High | ~5.6k | cymbals over-brightened |
+| V-hi | ~9.4k | hihats smear / over-widen |
+| Air | ~16k | sparse-highs material |
 
-The flag is only sent when at least one band differs from 1.0. All-1.0 = engine default.
+Only sent when at least one band differs from 1.0.
+
+## 3 · Pre-compression
+
+### Enabled → `--pre_compression`
+**Default:** on. Loudness-domain compressor before the limiter; evens out the loudest moments.
+Can be a source of **pumping**. Disable to preserve full dynamics.
+
+### Threshold offset → `--pre_compression_threshold`
+**Range:** 0 … 18 dB · **Default:** 6 dB. How many dB above measured loudness it activates.
+Higher = activates less often = more dynamics, less pumping.
+
+### Window → `--pre_compression_mean_sec`
+**Range:** 0.05 … 1.0 s · **Default:** 0.2 s. Averaging window. **~0.4 s** smooths the action.
+
+## 4 · Phase limiter
+
+### Oversampling → `--limiter_internal_oversample`
+**1 / 2 / 4 · Default 1.** Hard limiting at 44.1 kHz aliases (harsh **crunch**); `2×`/`4×` removes
+most of it. **Recommended 2×.** CPU/RAM cost scales with the factor.
+
+### Quality (iterations) → `--max_iter1`
+**40 … 400 · Default 100.** The limiter is an iterative FISTA optimizer. Too few = audible error
+(crunch) and pre-ringing (transient smear). **Try 200** for a final master.
+
+## 5 · Ceiling
+
+### True-peak ceiling → `--ceiling`
+**Range:** −3.0 … 0.0 dB · **Default:** −1.0 dB. Maximum inter-sample peak. At `0 dB`, peaks can
+exceed 0 dBFS after MP3/AAC encoding → audible **clicks**. **−1.0 dB** gives headroom.
+
+## 6 · Section-aware mastering → `--mastering5_section_ranges` / `--mastering5_section_intensity`
+
+Detected quiet spans (intros, breaks) are blended toward the **dry** (unprocessed) signal in a
+single engine pass, so they get gentler processing without a separate re-render or splice.
+
+- **Section intensity** (default `0.25`): wet/dry blend strength inside sections. `1` = full
+  AutoMastering5, `0` = fully dry.
+- A **1 s raised-cosine ramp** at each boundary prevents clicks.
+- The list is editable: **+ Add** a span (start/end seconds), **Remove** a row.
+
+Detection: spans where short-term loudness sits well below the track's loud-section reference.
+Only sent when the feature is enabled and at least one section exists.
 
 ---
 
-## Analysis & suggestions
+## Track analysis & comparison
 
-### Analyze a track & suggest settings
-Measures the chosen audio file (`audio_analyzer`) and auto-fills every control with
-gentle, glitch-avoiding values derived from LRA, true-peak and spectral balance.
-Non-WAV inputs are decoded to a temp WAV via `ffmpeg` automatically.
-
-After analysis the **Detected quiet sections** list is also populated.
-
-### Before/after report (double-click a finished row)
-Opens a dialog showing:
-- **Metrics scorecard** — LUFS, LRA, True-peak, Dynamics, Stereo, Sound Quality 2 (input → output, with warnings)
-- **Analysis images** — spectrogram, spectrum balance, stereo image (input vs. output side by side)
-- **Detected quiet sections** from the input file
-
----
-
-## Detected quiet sections
-
-The algorithm finds spans where the short-term loudness sits ≥9 LU below the track's
-loud-section reference (95th percentile of the curve). A single global master tends to
-over-process these spots — AutoMastering5 fits one compressor to whole-song statistics
-(dominated by the loud sections) and boosts near-empty bands in sparse material.
-
-**Editing the list:**
-- **+ Add** — manually add a section by entering start and end times in seconds.
-- **Remove** — delete the selected row.
-
-**Section intensity** — the gentler mastering level used to re-render quiet sections
-(default `0.25`).
-
-**Section-aware mastering** — when enabled and sections are present:
-1. The engine masters the whole track normally (preserves the loudness arc).
-2. Each quiet section is re-mastered from the original input with the gentler level.
-3. The rescued section is loudness-matched to the global master at that point.
-4. It is spliced back with 80 ms cross-fades at the boundaries.
-
-If any rescue step fails, the output falls back to the global master — the base is never lost.
-
----
-
-## Reference tone (EQ) → `--mastering5_mastering_reference_file`
-
-AutoMastering5 targets a **reference** — a per-ERB-band array of `mid_mean` values (target
-mono level in dB): the **AI's target tonal curve**. The four sliders tilt it without
-recompiling the engine:
-
-| Slider | Frequency range | Effect at +dB |
-|---|---|---|
-| Low | <250 Hz | bassier target |
-| Low-mid | 250–2000 Hz | warmer mids |
-| High-mid | 2000–6000 Hz | more presence / brightness |
-| High | >6000 Hz | more air |
-
-**Range:** ±6 dB · **Default:** 0 (no change)
-
-The GUI applies the offsets to `mid_mean` in a temp copy of `mastering_reference.json`
-and passes it via `--mastering5_mastering_reference_file`. The `covariance`, `side_mean`
-and all other fields are preserved verbatim.
-
-> **⚠ Over-boosting an empty band** (e.g. +6 dB High on a track with little high-frequency
-> content) fights the limiter and can **worsen** artifacts. Start with ±2 dB and check
-> the before/after report spectrum image.
+- **Track analysis** (drawer): LUFS, true-peak, LRA, dynamics, sample rate, duration, and a
+  **spectrogram** (Time × Frequency axes, with a help popover).
+- **Analyze & suggest**: measures the track (`audio_analyzer`; non-WAV decoded via `ffmpeg`) and
+  fills controls with glitch-avoiding values; also populates detected sections.
+- **Mastering comparison** (expand a finished job): input vs output **metrics** (LUFS / true-peak /
+  LRA with deltas), **per-band level** with the dB change printed per band, **loudness over time**,
+  and **input/output spectrograms**.
 
 ---
 
@@ -184,10 +138,10 @@ and all other fields are preserved verbatim.
 
 | What you hear | First fix | Then |
 |---|---|---|
-| Clicks / crackles | True-peak ceiling → **−1.0 dB** | Check output format (WAV is safest) |
+| Clicks / crackles | True-peak ceiling → **−1.0 dB** | Output as WAV |
 | Crunch on peaks | Limiter oversampling → **2×** | Limiter quality → **200**; lower loudness |
 | Pumping / breathing | Pre-comp window → **0.4 s** | Raise threshold or disable pre-compression |
-| Smearing / loss of clarity | Limiter quality → **200** | Lower mastering intensity |
-| Wrong tone — too bright or dark | Reference tone (EQ) → tilt sliders | Start with ±2 dB; verify with before/after report |
-| Distortion on quiet intro / break | Detected sections + section intensity 0.15–0.25 | Enable Section-aware mastering |
-| Kick deformation / hihat over-widening | Per-band boost limit: lower Sub/Low (kick) or High/Very-high/Air (hihats) | Combine with lower Stereo match strength |
+| Smearing / loss of clarity | Limiter quality → **200** | Lower Intensity |
+| Wrong tone — too bright/dark | EQ correction → drag the band(s) | Watch the dashed-red prediction; verify in comparison |
+| Distortion on quiet intro / break | Section-aware + section intensity 0.15–0.25 | — |
+| Kick deformation / hihat over-widening | Per-band optimizer: lower Sub/Low (kick) or High/V-hi/Air (hihats) | Combine with lower Stereo match |

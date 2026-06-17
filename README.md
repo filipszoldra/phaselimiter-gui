@@ -1,55 +1,64 @@
 # phaselimiter-gui (filipszoldra fork)
 
-A GUI frontend for **phaselimiter** — the same AI mastering algorithm used on
+A desktop GUI for **phaselimiter** — the same AI mastering algorithm used on
 [bakuage.com](https://bakuage.com) / [aimastering.com](https://aimastering.com).
 Processes locally, no internet required.
 
-> **Work in progress:** a redesigned UI and a bundled one-click installer (engine + GUI
-> in a single download artifact) are planned as the next milestone. The current release
-> requires manually assembling the engine directory beside the exe — see [Install](#install-windows) below.
+The UI is a modern web frontend (HTML/CSS/JS) rendered in a **WebView2** window; Go is a thin
+native host that runs the C++ engine as a child process. No audio is processed in this repo.
 
 ## What this fork adds
 
 This fork by **Filip Szołdra** extends the original upstream project
-([ai-mastering/phaselimiter-gui](https://github.com/ai-mastering/phaselimiter-gui))
-with practical controls and analysis tools aimed at reducing mastering glitches
-("crunch", pumping, true-peak clicks, smearing) and giving the user fine-grained
-control over the AutoMastering5 engine.
+([ai-mastering/phaselimiter-gui](https://github.com/ai-mastering/phaselimiter-gui)) with a
+redesigned UI and controls aimed at reducing mastering glitches ("crunch", pumping, true-peak
+clicks, smearing) and giving fine-grained control over the AutoMastering5 engine.
 
-Most GUI-side features pass existing engine flags and require no engine recompile.
-The **per-band boost limit** feature required a fork and rebuild of the C++ engine
-(see [filipszoldra/phaselimiter](https://github.com/filipszoldra/phaselimiter)) to add
-the `--mastering5_eq_band_levels` flag.
+Most features pass existing engine flags and need no engine recompile. A few required a fork and
+rebuild of the C++ engine ([filipszoldra/phaselimiter](https://github.com/filipszoldra/phaselimiter))
+to add new flags — see that repo's README.
 
-| Feature | vs. upstream |
+| Feature | What it does |
 |---|---|
-| **Advanced glitch-reduction controls** | NEW — limiter oversampling (1×/2×/4×), limiter quality (iterations), true-peak ceiling, pre-compression on/off + threshold + smoothing window |
-| **Stereo match strength** | NEW — `--mastering_ms_matching_level`; lower reduces over-widening on tracks with sparse stereo content |
-| **Per-band boost limit (9-band EQ)** | NEW — 9 spinbuttons (0.0–2.0, default 1.0) controlling `--mastering5_eq_band_levels` (added in the engine fork); limits how aggressively the AI reshapes each frequency band; fixes kick deformation and hihat over-widening |
-| **Section-aware mastering** | NEW — detects quiet sections (breaks, intros), re-renders them with a gentler level, loudness-matches to the global master and splices back with cross-fades |
-| **"Analyze & suggest settings"** | NEW — measures a track and auto-fills every control with glitch-avoiding values derived from LRA, true-peak and spectral balance |
-| **Before/after report** | NEW — double-click a finished row: LUFS/LRA/true-peak scorecard + spectrogram, spectrum and stereo images side by side |
-| **Reference-tone EQ** | NEW — tilts the AI's tonal target (mid_mean per ERB band) via ±6 dB sliders; Low / Low-mid / High-mid / High |
-| **Diagnostic "Limiter only" mode** | NEW — bypasses AutoMastering5 to isolate whether distortion comes from the limiter or the reference-matching stage |
-| **Bigger default window** | 720×600 instead of 400×400 |
-
-## Controls documentation
-
-- [English controls reference](docs/controls-en.md) — every control, the engine flag it maps to, and its audible effect
-- [Polski opis sterowania](docs/sterowanie-pl.md) — to samo po polsku + tabela "objaw → lekarstwo"
+| **Modern WebView2 UI** | Card-based layout, live SVG charts, help popovers, drag-and-drop, in-app before/after comparison |
+| **Analysis EQ correction** | Drag a per-band curve (±12 dB) to shape the target; a dashed-red overlay + fill show the predicted result (your move × intensity, capped ±6 dB). Sent via `--eq_analysis_target` |
+| **Per-band optimizer (advanced)** | 9-band curve (0–2, 1 = neutral) restraining how aggressively AutoMastering5 reshapes each band, with ceiling / transform modes (`--mastering5_eq_band_levels`, `--mastering5_eq_transform_levels`) |
+| **Section-aware mastering** | Detects quiet sections and blends them toward the dry signal in a single engine pass with 1 s raised-cosine ramps (`--mastering5_section_ranges` / `--mastering5_section_intensity`) — no re-render/splice |
+| **Glitch-reduction controls** | Limiter oversampling (1×/2×/4×), limiter quality (iterations), true-peak ceiling, pre-compression on/off + threshold + window |
+| **Stereo match strength** | `--mastering_ms_matching_level`; lower reduces over-widening on sparse-stereo material |
+| **Track analysis** | Per-band spectrum, LUFS / true-peak / LRA / dynamics, and a spectrogram with Time/Frequency axes |
+| **Before/after comparison** | Per finished job: input vs output metrics, per-band dB change, loudness-over-time, and input/output spectrograms |
+| **Analyze & suggest** | Measures a track and fills controls with glitch-avoiding values |
+| **Diagnostic "Limiter only"** | Bypasses AutoMastering5 to isolate limiter vs reference-matching artifacts |
 
 ## Install (Windows)
 
-> **Note:** a bundled installer that includes the engine is planned. For now, assembly is manual.
+### Option A — unified download (recommended)
 
-1. Install [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
-2. Download the **GUI artifact** from [GitHub Actions](../../actions) → `build-win` workflow → latest run on `master`.
-3. Download the **engine artifact** (`engine-bin`) from [filipszoldra/phaselimiter](https://github.com/filipszoldra/phaselimiter) → Actions → `build-engine` → latest run.
-4. Place `ffmpeg.exe` ([ffmpeg.org](https://ffmpeg.org/)) in the same folder as `phaselimiter-gui.exe` (or add to `%PATH%`).
-5. Create a `phaselimiter/` folder beside `phaselimiter-gui.exe` and copy the engine `bin/` and `resource/` directories into it.
-6. Run `phaselimiter-gui.exe`.
+1. Download **`phaselimiter-gui-win64.zip`** from the
+   [latest release](https://github.com/filipszoldra/phaselimiter-gui/releases/latest).
+   It bundles the GUI, the engine (`phaselimiter/`), and `ffmpeg.exe` — everything needed.
+2. Unzip anywhere (e.g. `C:\phaselimiter-gui\`).
+3. Run **`phaselimiter-gui.exe`** (or `phaselimiter-gui-console.exe` to see engine logs).
 
-Expected layout:
+Prerequisites (both ship with current Windows 10/11; install only if missing):
+- [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) — the UI renderer.
+- [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist) — for the engine.
+
+### Option B — assemble from CI artifacts (advanced)
+
+CI artifacts are split across two repos and require a GitHub login (they also expire). Use this
+only if you want a bleeding-edge build:
+
+1. Download the **GUI artifact** (`build-results`) from this repo's
+   [Actions](https://github.com/filipszoldra/phaselimiter-gui/actions) → `build-win` → latest run.
+2. Download the **engine artifact** (`engine-bin`) from
+   [filipszoldra/phaselimiter](https://github.com/filipszoldra/phaselimiter/actions) → `build-engine` → latest run.
+3. Add `ffmpeg.exe` ([ffmpeg.org](https://ffmpeg.org/)) beside the GUI exe (or on `%PATH%`).
+4. Assemble the layout below (the `resource/` dir comes from an
+   [upstream release](https://github.com/ai-mastering/phaselimiter/releases) — CI does not regenerate it).
+
+Expected layout (same for both options):
 ```
 phaselimiter-gui.exe
 phaselimiter-gui-console.exe
@@ -57,48 +66,56 @@ ffmpeg.exe
 phaselimiter/
   bin/
     phase_limiter.exe
-    *.dll
+    audio_analyzer.exe
+    *.dll              (IPP, TBB, Boost, sndfile, ...)
   resource/
     sound_quality2_cache/
     mastering_reference.json
     ...
 ```
 
-The `resource/` directory is taken from an [upstream release](https://github.com/ai-mastering/phaselimiter/releases) — it is not regenerated by the fork's CI.
-
 ## How to use
 
-Drop audio files onto the app window.
+1. **Drop audio files** on the window (or **+ Add files**). Analysis starts automatically and
+   fills the per-band spectrum chart.
+2. Set **Target loudness** (−9 to −14 LUFS) and **Intensity** (0.3–0.5 is a good start).
+3. (Optional) **Enable EQ correction** and drag the pink curve per band; the dashed-red overlay
+   shows the predicted applied change at the current intensity.
+4. (Optional) **Section-aware mastering** to gentle-ify detected quiet sections.
+5. (Optional) **Advanced: per-band optimizer** to restrain specific bands.
+6. **Master**. When a job finishes, expand **Mastering comparison** for the input/output report.
 
-**Recommended workflow:**
-1. Click **"Analyze a track & suggest settings"** → pick your track → all controls auto-fill with values tuned to its dynamics.
-2. Expand **"Detected quiet sections"** to review auto-detected problem spans (quiet intros, breaks).
-3. (Optional) Enable **"Section-aware mastering"** to re-render those sections with a gentler level.
-4. (Optional) Expand **"Advanced (glitch reduction)"** → adjust the **Per-band boost limit** spinbuttons to restrict how much the AI reshapes specific frequency bands (e.g. lower High/Very-high/Air for tracks with sparse highs).
-5. Drop the file. Double-click the finished row for a before/after report.
+See the controls reference for every control and the engine flag it maps to:
+- [English controls reference](docs/controls-en.md)
+- [Polski opis sterowania](docs/sterowanie-pl.md)
 
 ## Debug / console build
 
-`phaselimiter-gui-console.exe` — identical to the windowed build but logs all engine output and `Mastering` struct state to the console. Useful for verifying which flags are being passed.
+`phaselimiter-gui-console.exe` is identical to the windowed build but logs all engine output and
+the flags being passed. Useful for verifying what the engine is told to do.
+
+## Develop the UI without a build
+
+The web frontend runs in any browser with a mock bridge (no Go, no engine):
+```sh
+node web/server.js   # serves the UI at http://localhost:7734
+```
+When the `pl*` bindings are absent the bridge returns mock data, so layout and interactions stay
+testable.
 
 ## Build
 
-No local toolchain needed — CI cross-compiles on Fedora with `mingw64-gtk3`:
-
+Pure-Go, CGO-free — no mingw/GTK/Node toolchain. CI (`.github/workflows/build-win.yml`) builds on
+ubuntu:
 ```sh
-# approximate equivalent of what CI does:
-docker run --rm -v "$PWD:/src" -w /src fedora:39 bash -c "
-  yum install -y mingw64-gtk3 go glib2-devel mingw64-gcc.x86_64 &&
-  sed -i 's/-Wl,-luuid/-luuid/g' /usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig/gdk-3.0.pc &&
-  PKG_CONFIG_PATH=/usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig \
-    CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc GOOS=windows GOARCH=amd64 \
-    go build -ldflags -H=windowsgui -o phaselimiter-gui.exe
-"
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-H windowsgui" -o phaselimiter-gui.exe
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o phaselimiter-gui-console.exe
 ```
 
 ## Runtime dependencies
 
-- Microsoft Visual C++ Redistributable
+- Microsoft Edge WebView2 Runtime (UI)
+- Microsoft Visual C++ Redistributable (engine)
 - `ffmpeg.exe` (on `%PATH%` or beside the exe)
 - `phaselimiter/` engine directory with `bin/` and `resource/` (see Install)
 

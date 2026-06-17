@@ -1,182 +1,137 @@
 # phaselimiter-gui — opis kontrolek (PL)
 
 Przewodnik po ustawieniach masteringu i ich wpływie na dźwięk.
-Sekcja **Zaawansowane** służy do usuwania „glitchy" (trzasków, chrupania, pompowania),
+Kontrolki **zaawansowane** służą do usuwania glitchy (trzasków, chrupania, pompowania),
 które pojawiają się nawet przy spokojnym poziomie głośności i intensywności.
 
-> **Skrót dla niecierpliwych.** Słyszysz trzaski przy `-13 LUFS` i intensywności `0,4`?
-> To nie wina głośności — winne są etapy **limitera**, **sufitu** i **pre‑kompresji**.
-> Znajdziesz je w sekcji Zaawansowane poniżej.
+> **Skrót dla niecierpliwych.** Słyszysz chrupanie przy `-13 LUFS` i intensywności `0,4`?
+> To nie wina głośności — winne są etapy **limitera**, **sufitu** i **pre-kompresji**.
+> Napraw je zanim ruszysz Docelową głośność.
+
+Kontrolki odpowiadają numerowanym kartom w UI. Każda flaga silnika jest podana, by łatwiej
+czytać logi builda konsolowego (`phaselimiter-gui-console.exe`).
 
 ---
 
-## Ustawienia podstawowe
-
-### Katalog wyjściowy (Output directory)
-Folder, do którego zapisywane są pliki wynikowe (domyślnie `Pobrane` / `Pulpit`).
-Plik dostaje przyrostek `_output.wav`.
+## 1 · Głośność
 
 ### Docelowa głośność (Target loudness) → `--reference`
-**Zakres:** −20 … 0 LUFS · **Domyślnie:** −9 LUFS
+**Zakres:** −20 … 0 LUFS · **Domyślnie:** −14 LUFS
 
-Najważniejszy „duży" regulator. Określa, jak głośno ma być wyrównany utwór przed limiterem.
-Niższa wartość (np. `−13` / `−14`) = mniej wzmocnienia wpychanego w limiter = mniej chrupania
-i pompowania. **Zalecane −12 do −14** dla muzyki z zachowaną dynamiką.
+Najważniejszy regulator. Określa, jak głośno wyrównać utwór przed limiterem.
+Niżej (np. `−14`) = mniej wzmocnienia w limiter = mniej chrupania i pompowania.
+**Zalecane −9 do −14.**
 
-### Intensywność masteringu (Mastering intensity) → `--mastering5_mastering_level`
-**Zakres:** 0,0 … 1,0 · **Domyślnie:** 1,0
+## 2 · AutoMastering5 (ton i stereo)
 
-Określa, jak mocno AutoMastering5 przekształca brzmienie w stronę wyuczonego wzorca
-(korekcja pasmowa + kompresja M/S, dobierana optymalizacją różnicowo‑ewolucyjną).
-Niżej = delikatniej, bliżej oryginału.
+### Intensywność (Intensity) → `--mastering5_mastering_level`
+**Zakres:** 0,0 … 1,0 · **Domyślnie:** 0,4
 
-### Zachowaj bas (Preserve bass) → `--erb_eval_func_weighting`
-Włącza percepcyjne ważenie błędu limitera chroniące niskie częstotliwości.
+Jak mocno AutoMastering5 przekształca brzmienie w stronę wyuczonego wzorca (kompresja M/S per
+pasmo, dobierana optymalizacją różnicowo-ewolucyjną). Niżej = delikatniej, bliżej oryginału.
+**Zalecane 0,3–0,5.**
 
----
-
-## Zaawansowane — redukcja glitchy
-
-Te etapy działają **niezależnie** od głośności i intensywności — dlatego potrafią psuć
-dźwięk nawet przy spokojnych ustawieniach podstawowych.
-
-### Tylko limiter (diagnostyka) → `--mastering false`
-**Domyślnie:** wyłączone
-
-Pomija etap AutoMastering5 i uruchamia **sam limiter**. Służy do diagnozy: jeśli ciche
-fragmenty przestają być zniekształcone, winowajcą jest globalne dopasowanie AutoMastering5
-→ obniż **Intensywność** (np. do 0,2–0,3). Nie jest to tryb produkcyjny.
-
-### Sufit true‑peak (dB) → `--ceiling`
-**Zakres:** −3,0 … 0,0 dB · **Domyślnie:** −1,0 dB
-
-Maksymalny poziom szczytu między‑próbkowego. Przy `0 dB` szczyty po kodowaniu do MP3/AAC
-„wyskakują" ponad zero i słychać trzaski. Ustawienie **−1,0 dB** daje zapas i eliminuje
-większość kliknięć.
-
-### Nadpróbkowanie limitera (×) → `--limiter_internal_oversample`
-**Opcje:** 1 / 2 / 4 · **Domyślnie:** 1
-
-Twarde limitowanie przy 44,1 kHz tworzy aliasing (szorstkie chrupanie). Praca limitera
-w `2×` lub `4×` usuwa większość tego efektu. **Zalecane 2×**.
-
-### Jakość limitera (iteracje) → `--max_iter1`
-**Zakres:** 100 … 400 (co 50) · **Domyślnie:** 100
-
-Limiter to iteracyjny optymalizator (FISTA). Zbyt mała liczba = słyszalny błąd (chrupanie)
-i pre‑ringing (rozmycie transjentów). **Spróbuj 200** jeśli słyszysz zniekształcenia.
-
-### Pre‑kompresja → `--pre_compression`
-**Domyślnie:** włączona
-
-Kompresor działający **przed** limiterem. Wyrównuje najgłośniejsze fragmenty. Bywa źródłem
-**pompowania**. Odznacz, aby zachować pełną dynamikę.
-
-### Próg pre‑kompresji (dB) → `--pre_compression_threshold`
-**Zakres:** 0 … 18 dB · **Domyślnie:** 6 dB
-
-O ile dB ponad zmierzoną głośność zaczyna działać pre‑kompresor.
-Wyżej = kompresor reaguje rzadziej = więcej dynamiki, mniej pompowania.
-
-### Okno pre‑kompresji (s) → `--pre_compression_mean_sec`
-**Zakres:** 0,05 … 1,0 s · **Domyślnie:** 0,2 s
-
-Długość okna uśredniania. **Wydłużenie do ~0,4 s** wygładza działanie i redukuje pompowanie.
-
-### Siła dopasowania stereo → `--mastering_ms_matching_level`
+### Dopasowanie stereo (Stereo match) → `--mastering_ms_matching_level`
 **Zakres:** 0 … 1 · **Domyślnie:** 1,0
 
-Określa, jak mocno AutoMastering5 przekształca pole stereo (balans M/S) w kierunku wzorca.
-Przy `1,0` w pełni dopasowuje szerokość stereo per pasmo do wzorca referencyjnego. Obniżenie do
-`0,5`–`0,7` zachowuje więcej oryginalnego obrazu stereo i redukuje nadmierne poszerzanie
-hihatsów lub przestrzenne rozmycie na materiale ze rzadkimi górami.
+Jak mocno pole stereo (balans M/S) jest dopasowane do wzorca. Obniżenie do `0,5`–`0,7` zachowuje
+więcej oryginalnego obrazu stereo i redukuje nadmierne poszerzanie hihatsów / rozmycie przestrzeni.
 
-### Limit wzmocnienia per pasmo → `--mastering5_eq_band_levels`
-**Zakres:** 0,0 … 2,0 per pasmo · **Domyślnie:** 1,0 (neutralnie)
+### Korekcja EQ (cel per pasmo) → `--eq_analysis_target`
+Włącz **„EQ correction"**, by przeciągać **różową krzywą** per pasmo (±12 dB) nad zanalizowanym
+widmem. Ustawiona wartość to Twoja **modyfikacja** pasma; **czerwona przerywana krzywa + czerwone
+wypełnienie** pokazują **przewidywany efekt** = `modyfikacja × intensywność`, **maks. ±6 dB**
+(silnik to przycina). Ruch suwakiem intensywności aktualizuje podgląd na żywo.
 
-Dziewięć pokręteł — po jednym na każde pasmo częstotliwościowe silnika — skalujących **górną
-granicę wet-gain** optymalizatora AutoMastering5 (mid + side). Wartość < 1 ogranicza, ile AI
-może wzmocnić lub poszerzyć dane pasmo; > 1 pozwala na więcej. Ograniczenie jest miękkie
-(kara w funkcji kosztu), więc efekt jest proporcjonalny, nie twardy.
+Silnik aplikuje to jako statyczne wzmocnienie per pasmo **po** AutoMastering5 a **przed**
+pre-kompresją. GUI wysyła tablicę modyfikacji wprost; skalowanie przez intensywność i przycięcie
+±6 dB dzieje się w silniku. Etykiety pod pasmami pokazują częstotliwość środkową pasma.
 
-| Pasmo | Zakres | Kiedy obniżyć |
+> Zbyt duże wzmocnienie pustego pasma (np. +12 dB Air przy ubogich górach) walczy z limiterem i
+> może pogorszyć artefakty. Sprawdź w porównaniu przed/po.
+
+### Zachowaj bas (Preserve bass) → `--erb_eval_func_weighting`
+Percepcyjne ważenie błędu limitera chroniące niskie częstotliwości. Trzymaj włączone.
+
+### Tylko limiter (diagnostyka) → `--mastering false`
+Pomija AutoMastering5, uruchamia sam limiter. A/B: jeśli ciche fragmenty przestają być
+zniekształcone — winne jest dopasowanie referencji → obniż Intensywność. Nie tryb produkcyjny.
+
+### Zaawansowane: optymalizator per pasmo → `--mastering5_eq_band_levels` / `--mastering5_eq_transform_levels`
+Krzywa 9-pasmowa (0–2, **1 = neutralnie**) ograniczająca, jak agresywnie AutoMastering5 przekształca
+dane pasmo. Tryb **Ceiling** (`--mastering5_eq_band_levels`) skaluje górną granicę wet-gain
+optymalizatora (miękka kara, proporcjonalnie). Tryb **Transform** (`--mastering5_eq_transform_levels`)
+skaluje zrealizowany wet-gain po optymalizacji (deterministycznie). Selektor „Parameter affects" i
+nadpisania per pasmo wybierają tryb; **Symmetric transform** skaluje też cięcia.
+
+| Pasmo | Częstotliwość | Kiedy obniżyć |
 |---|---|---|
-| Sub | 0–148 Hz | gdy bas ulega deformacji |
-| Low | 148–392 Hz | gdy kopnięcie kopyta jest pompowane |
-| Low-mid | 392–795 Hz | |
-| Mid | 795–1458 Hz | |
-| Upper-mid | 1458–2550 Hz | |
-| Presence | 2550–4349 Hz | gdy wokale stają się szorstkie |
-| High | 4349–7314 Hz | gdy talerze są przejaskrawione |
-| Very-high | 7314–12k Hz | gdy hihatsy rozmywają się / poszerzają |
-| Air | 12k+ Hz | przy nagraniach ze rzadkimi górami |
+| Sub | ~54 Hz | gdy bas się deformuje |
+| Low | ~240 Hz | gdy korpus stopy jest pompowany |
+| Lo-mid | ~560 Hz | |
+| Mid | ~1.1k | |
+| Up-mid | ~1.9k | |
+| Pres | ~3.3k | gdy wokale są szorstkie |
+| High | ~5.6k | gdy talerze przejaskrawione |
+| V-hi | ~9.4k | gdy hihatsy rozmywają / poszerzają |
+| Air | ~16k | przy ubogich górach |
 
-Flaga jest wysyłana tylko gdy co najmniej jedno pasmo różni się od 1,0. Wszystkie 1,0 = domyślne zachowanie silnika.
+Wysyłane tylko gdy co najmniej jedno pasmo różni się od 1,0.
+
+## 3 · Pre-kompresja
+
+### Włączona → `--pre_compression`
+**Domyślnie:** włączona. Kompresor przed limiterem; wyrównuje najgłośniejsze fragmenty.
+Bywa źródłem **pompowania**. Wyłącz, by zachować pełną dynamikę.
+
+### Próg (offset) → `--pre_compression_threshold`
+**Zakres:** 0 … 18 dB · **Domyślnie:** 6 dB. O ile dB ponad zmierzoną głośność zaczyna działać.
+Wyżej = reaguje rzadziej = więcej dynamiki, mniej pompowania.
+
+### Okno → `--pre_compression_mean_sec`
+**Zakres:** 0,05 … 1,0 s · **Domyślnie:** 0,2 s. Okno uśredniania. **~0,4 s** wygładza działanie.
+
+## 4 · Phase limiter
+
+### Nadpróbkowanie → `--limiter_internal_oversample`
+**1 / 2 / 4 · Domyślnie 1.** Twarde limitowanie przy 44,1 kHz aliasuje (szorstkie **chrupanie**);
+`2×`/`4×` usuwa większość. **Zalecane 2×.** Koszt CPU/RAM rośnie z mnożnikiem.
+
+### Jakość (iteracje) → `--max_iter1`
+**40 … 400 · Domyślnie 100.** Limiter to iteracyjny optymalizator (FISTA). Za mało = słyszalny błąd
+(chrupanie) i pre-ringing (rozmycie transjentów). **Spróbuj 200** na finalny master.
+
+## 5 · Sufit
+
+### Sufit true-peak → `--ceiling`
+**Zakres:** −3,0 … 0,0 dB · **Domyślnie:** −1,0 dB. Maks. szczyt między-próbkowy. Przy `0 dB` szczyty
+po kodowaniu MP3/AAC wyskakują ponad 0 dBFS → słyszalne **trzaski**. **−1,0 dB** daje zapas.
+
+## 6 · Mastering świadomy sekcji → `--mastering5_section_ranges` / `--mastering5_section_intensity`
+
+Wykryte ciche fragmenty (intra, breaki) są mieszane w stronę sygnału **dry** (nieprzetworzonego)
+w **jednym przebiegu** silnika — dostają delikatniejsze przetwarzanie bez osobnego re-renderu i
+sklejania.
+
+- **Intensywność sekcji** (domyślnie `0,25`): siła blendu wet/dry w sekcji. `1` = pełny
+  AutoMastering5, `0` = całkowicie dry.
+- **Rampa 1 s** (raised-cosine) na każdej granicy zapobiega kliknięciom.
+- Lista jest edytowalna: **+ Add** (start/koniec w sekundach), **Remove**.
+
+Wykrywanie: fragmenty gdzie krótkoterminowa głośność jest wyraźnie poniżej poziomu głośnych
+fragmentów utworu. Wysyłane tylko gdy funkcja włączona i istnieje sekcja.
 
 ---
 
-## Analiza i sugestie
+## Analiza i porównanie
 
-### Analizuj utwór i zasugeruj ustawienia
-Przycisk mierzy wybrany plik audio (`audio_analyzer`) i automatycznie wypełnia wszystkie
-kontrolki łagodnymi wartościami na podstawie LRA, true‑peak i balansu pasm.
-Pliki inne niż WAV są dekodowne przez `ffmpeg` do tymczasowego WAV.
-
-Po analizie lista **Wykryte sekcje ciche** uzupełnia się automatycznie.
-
-### Raport przed/po (dwuklik gotowego wiersza)
-Otwiera okno z:
-- **Tabelą pomiarów** — LUFS, LRA, True‑peak, Dynamika, Stereo, Sound Quality 2
-- **Obrazami** — spektrogram, rozkład widma, obraz stereo (input vs. output)
-- **Listą sekcji cichych** wykrytych w pliku wejściowym
-
----
-
-## Wykryte sekcje ciche
-
-Algorytm szuka fragmentów, gdzie krótkoterminowa głośność jest ≥9 LU poniżej typowego
-poziomu głośnego fragmentu (95. percentyl krzywej). Globalny mastering zwykle nadmiernie
-przetwarza takie miejsca — AutoMastering5 dopasowuje się do statystyk całości i podbija
-niemal puste pasma w cichych momentach.
-
-**Edycja listy:**
-- **+ Add** — ręcznie dodaj sekcję podając start i koniec w sekundach.
-- **Remove** — usuń zaznaczony wiersz.
-
-**Intensywność sekcji** — delikatniejszy poziom masteringu używany do re‑renderowania
-cichych fragmentów (domyślnie `0,25`).
-
-**Section-aware mastering** — gdy zaznaczony:
-1. Silnik masteruje cały utwór normalnie (zachowuje łuk głośności).
-2. Każdą cichą sekcję masteruje ponownie z delikatniejszą intensywnością.
-3. Uratowaną sekcję wyrównuje głośnościowo do global mastera.
-4. Wkleja ją z powrotem z 80 ms cross‑fade na granicach.
-
-Jeśli rescue nie powiodło się, plik wynikowy pozostaje global masterem.
-
----
-
-## Ton referencyjny (EQ) → `--mastering5_mastering_reference_file`
-
-AutoMastering5 dopasowuje brzmienie do **wzorca referencyjnego** — tablicy wartości
-`mid_mean` (docelowy poziom każdego pasma ERB w dB): **docelowa krzywa tonalna AI**.
-Cztery suwaki pozwalają ją przechylić bez przebudowania silnika:
-
-| Suwak | Zakres częst. | Efekt +dB |
-|---|---|---|
-| Low | <250 Hz | bassowszy dźwięk |
-| Low-mid | 250–2000 Hz | cieplejszy środek |
-| High-mid | 2000–6000 Hz | obecność / jasność |
-| High | >6000 Hz | więcej powietrza |
-
-**Zakres:** ±6 dB · **Domyślnie:** 0 (brak zmiany)
-
-GUI modyfikuje `mid_mean` w tymczasowej kopii `mastering_reference.json` i przekazuje
-ją przez `--mastering5_mastering_reference_file`. Pola `covariance`, `side_mean`
-i inne pozostają niezmienione.
-
-> **⚠ Zbyt duże wzmocnienie pustego pasma** (np. +6 dB High przy nagraniu bez wysokich
-> harmonicznych) walczy z limiterem i może **pogorszyć** artefakty. Zacznij od ±2 dB.
+- **Track analysis** (panel boczny): LUFS, true-peak, LRA, dynamika, sample rate, czas oraz
+  **spektrogram** (osie Czas × Częstotliwość, z helperem).
+- **Analyze & suggest**: mierzy utwór (`audio_analyzer`; nie-WAV dekodowane przez `ffmpeg`) i
+  wypełnia kontrolki łagodnymi wartościami; uzupełnia też wykryte sekcje.
+- **Mastering comparison** (rozwiń gotowy wiersz): metryki input vs output (LUFS / true-peak / LRA
+  z deltami), **poziom per pasmo** z wypisaną zmianą dB, **głośność w czasie** oraz
+  **spektrogramy input/output**.
 
 ---
 
@@ -184,10 +139,10 @@ i inne pozostają niezmienione.
 
 | Co słyszysz | Najpierw zmień | Potem |
 |---|---|---|
-| Trzaski / kliknięcia | Sufit true‑peak → **−1,0 dB** | Sprawdź format wyjścia (WAV jest najbezpieczniejszy) |
+| Trzaski / kliknięcia | Sufit true-peak → **−1,0 dB** | Wyjście jako WAV |
 | Chrupanie na szczytach | Nadpróbkowanie limitera → **2×** | Jakość limitera → **200**; niższa głośność |
-| Pompowanie / oddychanie | Okno pre‑komp. → **0,4 s** | Próg pre‑komp. wyżej lub wyłącz pre‑kompresję |
-| Rozmycie / utrata klarowności | Jakość limitera → **200** | Niższa intensywność masteringu |
-| Zła barwa — za jasno lub ciemno | Ton referencyjny (EQ) → przechyl suwaki | Zacznij od ±2 dB; użyj raportu przed/po |
-| Distortion na cichym intro / break | Sekcje ciche + intensywność sekcji 0,15–0,25 | Włącz Section-aware mastering |
-| Deformacja kopnięcia / hihatsy się poszerzają | Limit per pasmo: obniż Sub/Low (kopnięcie) lub High/Very-high/Air (hihats) | Połącz z niższą siłą dopasowania stereo |
+| Pompowanie / oddychanie | Okno pre-komp. → **0,4 s** | Próg wyżej lub wyłącz pre-kompresję |
+| Rozmycie / utrata klarowności | Jakość limitera → **200** | Niższa Intensywność |
+| Zła barwa — za jasno/ciemno | Korekcja EQ → przeciągnij pasmo(a) | Patrz na czerwoną przerywaną; sprawdź w porównaniu |
+| Distortion na cichym intro / break | Section-aware + intensywność sekcji 0,15–0,25 | — |
+| Deformacja stopy / hihatsy się poszerzają | Optymalizator per pasmo: obniż Sub/Low (stopa) lub High/V-hi/Air (hihats) | Połącz z niższym Dopasowaniem stereo |
