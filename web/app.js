@@ -7,14 +7,32 @@
 // ---------------------------------------------------------------------------
 const HAS_GO = typeof window.plStartMastering === "function";
 
+// Analysis runs in a Go goroutine (the WebView2 UI thread invokes bound functions
+// synchronously, so a blocking analyze would freeze the window). The bound function
+// is fire-and-forget: we hand it a request id, and Go resolves the matching promise
+// later via window.__plAnalyzeResolve. This keeps every `await bridge.analyze*` site working.
+let _analyzeSeq = 0;
+const _analyzePending = new Map();
+window.__plAnalyzeResolve = (id, result, err) => {
+  const p = _analyzePending.get(id);
+  if (!p) return;
+  _analyzePending.delete(id);
+  err ? p.reject(new Error(err)) : p.resolve(result);
+};
+const wrapAnalyze = (fn) => (path) => new Promise((resolve, reject) => {
+  const id = ++_analyzeSeq;
+  _analyzePending.set(id, { resolve, reject });
+  fn(id, path);
+});
+
 const bridge = {
   pickInputFiles: HAS_GO ? window.plPickInputFiles : async () =>
     ["C:\\Music\\demo track.wav", "C:\\Music\\second take.mp3"],
   pickOutputDir: HAS_GO ? window.plPickOutputDir : async () => "C:\\Users\\you\\Downloads",
   defaultOutputDir: HAS_GO ? window.plDefaultOutputDir : async () => "C:\\Users\\you\\Downloads",
   startMastering: HAS_GO ? window.plStartMastering : mockStartMastering,
-  analyze: typeof window.plAnalyze === "function" ? window.plAnalyze : mockAnalyze,
-  analyzeFull: typeof window.plAnalyzeFull === "function" ? window.plAnalyzeFull : mockAnalyzeFull,
+  analyze: typeof window.plAnalyze === "function" ? wrapAnalyze(window.plAnalyze) : mockAnalyze,
+  analyzeFull: typeof window.plAnalyzeFull === "function" ? wrapAnalyze(window.plAnalyzeFull) : mockAnalyzeFull,
   getReference: typeof window.plGetReference === "function" ? window.plGetReference : mockGetReference,
 };
 
@@ -234,14 +252,13 @@ function spectroFigureHTML(src, caption, durationSec) {
   if (!src) return "";
   const dur = durationSec ? fmtSec(durationSec) : "";
   const help = caption ? "" : ` <button class="help" type="button" data-help="${SPECTRO_HELP}">?</button>`;
-  const head = caption
-    ? `<span class="spectro-title">${caption}</span>`
-    : `<span class="spectro-title">Spectrogram</span>${help}`;
+  const head = `<span class="spectro-title">${caption || "Spectrogram"}</span>${help}`
+    + ` <button class="spectro-zoom" type="button" title="Enlarge">⤢</button>`;
   return `<figure class="spectro-fig">
       <div class="spectro-head">${head}</div>
       <div class="spectro-body">
         <div class="spectro-yaxis"><span>20k</span><span>5k</span><span>1k</span><span>0&#8201;Hz</span></div>
-        <img class="spectro" src="${src}" alt="Spectrogram${caption ? " " + caption : ""}" />
+        <img class="spectro" src="${src}" data-duration="${durationSec || 0}" alt="Spectrogram${caption ? " " + caption : ""}" />
       </div>
       <div class="spectro-xaxis"><span>0:00</span><span>Time</span><span>${dur}</span></div>
     </figure>`;
@@ -979,6 +996,7 @@ function secSecFromX(x) {
 
 let _secSvg = null;
 let _secHandleEls = [];
+let _secDrawMode = false;
 
 function buildSectionsChart() {
   const ns = "http://www.w3.org/2000/svg";
@@ -1003,8 +1021,12 @@ function buildSectionsChart() {
     msg.textContent = "Run Analyze to see loudness timeline & auto-detected sections";
     svg.appendChild(msg);
     container.appendChild(svg);
+    el("secAddRow")?.classList.add("hidden");
     return;
   }
+
+  el("secAddRow")?.classList.remove("hidden");
+  if (_secDrawMode) svg.classList.add("draw-mode");
 
   // Background
   const bg = document.createElementNS(ns, "rect");
@@ -1131,14 +1153,62 @@ function buildSectionsChart() {
   svg.appendChild(phLine);
   _playheadEl = phLine;
 
-  // Click on chart: if playing → pause; if paused → seek + play
+  // Click on chart: if playing → pause; if paused → seek + play (skipped in draw mode)
   svg.addEventListener("click", (e) => {
+    if (_secDrawMode) return;
     if (e.target.classList.contains("sec-hit")) return;
     const audio = getAudio();
     if (!audio.paused) { audio.pause(); return; }
     const rect = svg.getBoundingClientRect();
     const sec = secSecFromX((e.clientX - rect.left) / rect.width * SEC_W);
     playfrom(sec);
+  });
+
+  // Drag on SVG background in draw mode creates a new section
+  let _drawStartSec = null, _drawEl = null, _drawMoved = false;
+  svg.addEventListener("pointerdown", (e) => {
+    if (!_secDrawMode) return;
+    if (e.target.classList.contains("sec-hit")) return;
+    e.preventDefault(); e.stopPropagation();
+    svg.setPointerCapture(e.pointerId);
+    const rect = svg.getBoundingClientRect();
+    _drawStartSec = secSecFromX((e.clientX - rect.left) / rect.width * SEC_W);
+    _drawMoved = false;
+    _drawEl = document.createElementNS(ns, "rect");
+    _drawEl.setAttribute("class", "sec-shade sec-drawing");
+    _drawEl.setAttribute("x", secX(_drawStartSec).toFixed(1));
+    _drawEl.setAttribute("y", String(SEC_PT));
+    _drawEl.setAttribute("width", "1");
+    _drawEl.setAttribute("height", String(SEC_CH));
+    svg.appendChild(_drawEl);
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (_drawStartSec === null || !_drawEl) return;
+    _drawMoved = true;
+    const rect = svg.getBoundingClientRect();
+    const curSec = secSecFromX((e.clientX - rect.left) / rect.width * SEC_W);
+    const s = Math.min(_drawStartSec, curSec);
+    const end = Math.max(_drawStartSec, curSec);
+    _drawEl.setAttribute("x", secX(s).toFixed(1));
+    _drawEl.setAttribute("width", Math.max(1, secX(end) - secX(s)).toFixed(1));
+  });
+  svg.addEventListener("pointerup", (e) => {
+    if (_drawStartSec === null) return;
+    const rect = svg.getBoundingClientRect();
+    const curSec = secSecFromX((e.clientX - rect.left) / rect.width * SEC_W);
+    if (_drawMoved && Math.abs(curSec - _drawStartSec) >= 1) {
+      const s = Math.round(Math.min(_drawStartSec, curSec) * 10) / 10;
+      const end = Math.round(Math.max(_drawStartSec, curSec) * 10) / 10;
+      state.sections.push({ startSec: s, endSec: end });
+      _secDrawMode = false;
+      const btn = el("addSectionBtn"); if (btn) btn.textContent = "+ Draw section";
+      const hint = el("addSectionHint"); if (hint) hint.textContent = "";
+      buildSectionsChart();
+      buildSectionsList();
+    } else {
+      if (_drawEl) _drawEl.remove();
+    }
+    _drawStartSec = null; _drawEl = null; _drawMoved = false;
   });
 
   container.appendChild(svg);
@@ -1384,6 +1454,57 @@ function setupHelp() {
   });
 }
 
+// Spectrogram lightbox: click a spectrogram (or its enlarge button) to view the
+// native-resolution PNG full-window with Hz and time axis labels.
+// Close via backdrop, the close button, or Esc.
+function setupSpectroLightbox() {
+  const box = el("spectroLightbox");
+  if (!box) return;
+  const content = el("spectroLightboxContent");
+
+  const open = (src, alt, durationSec) => {
+    const dur = durationSec ? fmtSec(durationSec) : "";
+    content.innerHTML = `
+      <div class="spectro-body lb-body">
+        <div class="spectro-yaxis lb-yaxis"><span>20k</span><span>10k</span><span>5k</span><span>2k</span><span>1k</span><span>500</span><span>200</span><span>0&#8201;Hz</span></div>
+        <img class="spectro lb-img" src="${src}" alt="${alt || "Spectrogram (full size)"}" />
+      </div>
+      <div class="spectro-xaxis lb-xaxis"><span>0:00</span><span>Time</span><span>${dur}</span></div>`;
+    box.classList.remove("hidden");
+  };
+  const close = () => { box.classList.add("hidden"); content.innerHTML = ""; };
+
+  document.addEventListener("click", (e) => {
+    const fig = e.target.closest(".spectro-fig");
+    if (fig && (e.target.closest(".spectro-zoom") || e.target.matches(".spectro-body img.spectro"))) {
+      const figImg = fig.querySelector(".spectro-body img.spectro");
+      if (figImg && figImg.src) open(figImg.src, figImg.alt, parseFloat(figImg.dataset.duration || "0"));
+      return;
+    }
+    // Click on backdrop or close button dismisses
+    if (e.target === box || e.target.id === "spectroLightboxClose") close();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !box.classList.contains("hidden")) close();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Section draw-mode toggle (activated by the Add section button)
+// ---------------------------------------------------------------------------
+function setupSectionDraw() {
+  const btn = el("addSectionBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    _secDrawMode = !_secDrawMode;
+    btn.textContent = _secDrawMode ? "✕ Cancel" : "+ Draw section";
+    const hint = el("addSectionHint");
+    if (hint) hint.textContent = _secDrawMode ? "Drag on the timeline to mark a section" : "";
+    // Rebuild so SVG picks up draw-mode class immediately
+    buildSectionsChart();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Wire up
 // ---------------------------------------------------------------------------
@@ -1399,6 +1520,8 @@ async function init() {
   setupReadouts();
   setupDnd();
   setupHelp();
+  setupSpectroLightbox();
+  setupSectionDraw();
   initEQ();
   setupEQModes();
   el("addFilesBtn").addEventListener("click", addFiles);

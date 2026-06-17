@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>phaselimiter-gui — documentation</title>
+<style>
+:root {
+  --bg:#14161a; --card:#1e2228; --card2:#242930; --fg:#e8eaed; --muted:#9aa3ad;
+  --accent:#5db0ff; --good:#57c98a; --warn:#f0b85a; --danger:#ff7070;
+  --border:#2a2f37;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--fg);
+  font:15px/1.65 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  padding-bottom:5rem; }
+a { color:var(--accent); }
+code { background:#0e1014; color:#cfe7ff; padding:.1rem .4rem; border-radius:4px;
+  font-family:ui-monospace,Consolas,Menlo,monospace; font-size:.85em; }
+
+/* ---- header ---- */
+header {
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+  padding:1.8rem 1.5rem 1.2rem; max-width:920px; margin:0 auto;
+}
+header h1 { font-size:1.7rem; }
+header p { color:var(--muted); font-size:.9rem; margin-top:.2rem; }
+.lang-switch { display:flex; gap:6px; }
+.lang-switch button {
+  background:var(--card2); border:1px solid var(--border); color:var(--muted);
+  border-radius:6px; padding:.3rem .8rem; cursor:pointer; font-size:.85rem;
+  transition:background .15s,color .15s;
+}
+.lang-switch button.active {
+  background:var(--accent); color:#0a0e14; border-color:var(--accent); font-weight:600;
+}
+
+/* ---- layout ---- */
+main { max-width:920px; margin:0 auto; padding:0 1.5rem; }
+.toc {
+  background:var(--card2); border:1px solid var(--border); border-radius:10px;
+  padding:1rem 1.2rem; margin-bottom:1.4rem;
+}
+.toc h3 { font-size:.9rem; color:var(--muted); margin-bottom:.6rem; text-transform:uppercase; letter-spacing:.05em; }
+.toc ol { padding-left:1.2em; }
+.toc li { margin:.25rem 0; font-size:.9rem; }
+section.card {
+  background:var(--card); border:1px solid var(--border); border-radius:12px;
+  padding:1.3rem 1.4rem; margin:1rem 0;
+}
+.card-head { display:flex; align-items:baseline; gap:.5rem; margin-bottom:1rem; }
+.card-head h2 { font-size:1.2rem; }
+.step { background:var(--accent); color:#0a0e14; border-radius:50%;
+  width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center;
+  font-size:.7rem; font-weight:700; flex-shrink:0; }
+.muted { color:var(--muted); font-size:.88rem; }
+h3 { font-size:1rem; color:var(--accent); margin:1.1rem 0 .35rem; }
+h3:first-child { margin-top:.2rem; }
+.meta { color:var(--muted); font-size:.85rem; margin:.1rem 0 .5rem; }
+.meta b { color:var(--fg); }
+p { margin:.4rem 0; font-size:.92rem; }
+ul, ol { padding-left:1.4em; font-size:.92rem; }
+li { margin:.2rem 0; }
+table { width:100%; border-collapse:collapse; margin:.8rem 0; font-size:.88rem; }
+th, td { text-align:left; padding:.45rem .6rem; border-bottom:1px solid var(--border); vertical-align:top; }
+th { color:var(--muted); font-weight:600; }
+.note {
+  border-left:3px solid var(--accent); padding:.5rem .9rem; margin:.9rem 0;
+  background:#0e1014; border-radius:0 8px 8px 0; color:var(--muted);
+}
+.note b, .note strong { color:var(--fg); }
+.warn-note { border-left-color:var(--warn); }
+.warn-note b { color:var(--warn); }
+.rec { color:var(--good); font-weight:600; }
+.pill { display:inline-block; font-size:.78rem; border-radius:6px; padding:.1rem .45rem; }
+.pill.crunch { background:#3a1f24; color:#ff9aa6; }
+.pill.clicks { background:#3a2f1a; color:#ffd28a; }
+.pill.pump  { background:#1f2f3a; color:#8ad0ff; }
+.pill.smear { background:#2a233a; color:#c4a8ff; }
+.pill.tone  { background:#2a3a1f; color:#a8ff8a; }
+.flag { font-size:.8rem; color:#cfe7ff; background:#0e1014; border:1px solid #2a3a4a;
+  border-radius:4px; padding:.05rem .35rem; font-family:ui-monospace,Consolas,Menlo,monospace; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+@media(max-width:600px) { .grid2 { grid-template-columns:1fr; } }
+footer { max-width:920px; margin:2.5rem auto 0; padding:0 1.5rem;
+  color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); padding-top:1rem; }
+
+/* ---- sub-section (nested card) ---- */
+.sub { background:var(--card2); border:1px solid var(--border); border-radius:8px;
+  padding:1rem 1.1rem; margin:.8rem 0; }
+.sub h4 { font-size:.95rem; color:var(--accent); margin-bottom:.4rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>phaselimiter-gui</h1>
+    <p>Documentation · filipszoldra fork</p>
+  </div>
+  <div class="lang-switch">
+    <button id="btnEn" onclick="setLang('en')">EN</button>
+    <button id="btnPl" onclick="setLang('pl')">PL</button>
+  </div>
+</header>
+
+<main>
+
+<!-- ======================================================== ENGLISH ======================================================== -->
+<div id="content-en" class="lang-content">
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#en-files">Files — input &amp; output</a></li>
+    <li><a href="#en-1">1 · Loudness target</a></li>
+    <li><a href="#en-2">2 · AutoMastering5 — tone &amp; stereo</a></li>
+    <li><a href="#en-3">3 · Pre-compression</a></li>
+    <li><a href="#en-4">4 · Phase limiter</a></li>
+    <li><a href="#en-5">5 · Ceiling</a></li>
+    <li><a href="#en-6">6 · Section-aware mastering</a></li>
+    <li><a href="#en-analysis">Analysis &amp; comparison</a></li>
+    <li><a href="#en-symptoms">Symptom → fix cheat sheet</a></li>
+  </ol>
+</div>
+
+<section class="card" id="en-files">
+  <div class="card-head"><h2>Files — input &amp; output</h2></div>
+
+  <h3>Input files</h3>
+  <p>Drag audio files onto the drop zone, or click <strong>+ Add files</strong>.
+  Supported: WAV, FLAC, MP3, AIFF, and any format <code>ffmpeg</code> can decode.
+  Multiple files are processed as a queue — each gets its own mastering job.</p>
+
+  <h3>Output folder</h3>
+  <p>Folder where mastered files are saved. Defaults to your Downloads folder.
+  Click <strong>Browse</strong> to pick a different location. The output folder is shared across all jobs
+  in the current session.</p>
+
+  <h3>Output filename</h3>
+  <p>Only used when a single file is in the queue. For multiple files, each output uses the
+  original filename with <code>_output.wav</code> appended.</p>
+</section>
+
+<section class="card" id="en-1">
+  <div class="card-head"><span class="step">1</span><h2>Loudness target</h2>
+    <span class="muted">the biggest lever</span></div>
+
+  <h3>Target loudness <span class="flag">--reference</span></h3>
+  <p class="meta"><b>Range:</b> −20 … 0 LUFS &nbsp;·&nbsp; <b>Default:</b> −14 LUFS &nbsp;·&nbsp;
+    <b>Recommended:</b> <span class="rec">−9 to −14 LUFS</span></p>
+  <p>Sets how loud the engine pushes the track before the phase limiter. This is the single
+  biggest control over the final sound. Lower values (e.g. −14) mean the limiter receives
+  less gain, which directly reduces crunch, pumping, and true-peak clicking.</p>
+  <ul>
+    <li><strong>−9 LUFS</strong> — streaming loudness norm; little headroom, strong limiting.</li>
+    <li><strong>−14 LUFS</strong> — YouTube/Spotify norm; comfortable dynamics, less crunch.</li>
+    <li><strong>−18 or quieter</strong> — mastering for later chain / archives.</li>
+  </ul>
+  <div class="note">If you hear crunch or pumping: <strong>lower this first</strong> (try −14 to −16)
+  before touching any other control.</div>
+</section>
+
+<section class="card" id="en-2">
+  <div class="card-head"><span class="step">2</span><h2>AutoMastering5</h2>
+    <span class="muted">tone &amp; stereo reshaping</span></div>
+  <p>AutoMastering5 (AM5) is the AI core of the engine. It is a per-band mid/side compressor
+  whose parameters are found by differential-evolution optimisation to match a learned reference
+  profile (<code>mastering_reference.json</code>). It adjusts tonal balance and stereo width
+  toward the reference, independently of the loudness target.</p>
+
+  <h3>Intensity <span class="flag">--mastering5_mastering_level</span></h3>
+  <p class="meta"><b>Range:</b> 0.0 … 1.0 &nbsp;·&nbsp; <b>Default:</b> 0.4 &nbsp;·&nbsp;
+    <b>Recommended:</b> <span class="rec">0.3–0.5</span></p>
+  <p>How strongly AM5 reshapes your track toward the learned reference tone and dynamics.</p>
+  <ul>
+    <li><strong>0</strong> — AM5 has no effect (still runs, but output = input).</li>
+    <li><strong>0.4</strong> — gentle reshaping; original character preserved.</li>
+    <li><strong>1.0</strong> — maximum reference matching; strong coloration.</li>
+  </ul>
+  <p>Intensity also scales the EQ correction below: your per-band modification is multiplied
+  by intensity inside the engine (capped at ±6 dB).</p>
+
+  <h3>Stereo match <span class="flag">--mastering_ms_matching_level</span></h3>
+  <p class="meta"><b>Range:</b> 0.0 … 1.0 &nbsp;·&nbsp; <b>Default:</b> 1.0</p>
+  <p>How strongly AM5 reshapes the stereo field (mid/side balance per band) toward the reference.
+  At 1.0, stereo width per band is fully matched. Lowering to <span class="rec">0.5–0.7</span>
+  preserves your original stereo image and reduces over-widening of hi-hats or spatial smearing
+  on sparse material.</p>
+
+  <h3>Analysis EQ correction <span class="flag">--eq_analysis_target</span></h3>
+  <p>When you add a file, the engine analyzes its per-band spectrum and draws a <strong>red curve</strong>
+  (your track's current level per band). Enable <em>EQ correction</em> to activate the editor:</p>
+  <ul>
+    <li><strong>Pink curve</strong> — your desired modification in dB (±12 dB per band). Drag it
+    up or down to boost or cut each frequency band.</li>
+    <li><strong>Dashed red curve + red fill</strong> — predicted applied result:
+    <code>modification × intensity</code>, capped at ±6 dB. This is what the engine will
+    actually apply. Move the Intensity slider and the prediction updates live.</li>
+    <li>The <strong>center frequency</strong> of each band is shown below its name.</li>
+  </ul>
+  <p>The engine applies this static per-band gain <em>after</em> AM5 and <em>before</em>
+  pre-compression. The GUI sends the raw modification array; intensity scaling and the ±6 dB
+  clamp happen inside the engine.</p>
+  <div class="note warn-note"><b>Warning:</b> boosting an empty band (e.g. +12 dB Air on a track with
+  very little high content) fights the limiter and can <em>worsen</em> artifacts. Check the
+  before/after comparison after each EQ change.</div>
+
+  <div class="sub">
+    <h4>Band center frequencies</h4>
+    <table>
+      <thead><tr><th>Band</th><th>Center freq.</th><th>When to modify</th></tr></thead>
+      <tbody>
+        <tr><td>Sub</td><td>~54 Hz</td><td>Boost for more sub bass; cut if bass is muddy</td></tr>
+        <tr><td>Low</td><td>~240 Hz</td><td>Boost for warmth; cut if kick body is bloated</td></tr>
+        <tr><td>Lo-mid</td><td>~560 Hz</td><td>Cut if mix sounds boxy</td></tr>
+        <tr><td>Mid</td><td>~1.1 kHz</td><td>Presence and body of instruments</td></tr>
+        <tr><td>Up-mid</td><td>~1.9 kHz</td><td>Aggression, guitar bite</td></tr>
+        <tr><td>Pres</td><td>~3.3 kHz</td><td>Cut if vocals are harsh</td></tr>
+        <tr><td>High</td><td>~5.6 kHz</td><td>Cut if cymbals are over-brightened</td></tr>
+        <tr><td>V-hi</td><td>~9.4 kHz</td><td>Cut if hi-hats smear or over-widen</td></tr>
+        <tr><td>Air</td><td>~16 kHz</td><td>Boost for air on bright material</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Preserve bass <span class="flag">--erb_eval_func_weighting</span></h3>
+  <p>Applies perceptual weighting in the phase limiter that protects low-frequency content from
+  over-limiting. Keep this on for most music — especially bass-heavy genres.</p>
+
+  <details style="margin-top:1rem">
+    <summary style="cursor:pointer;color:var(--muted);font-size:.9rem">Advanced: per-band optimizer
+      <span class="flag">--mastering5_eq_band_levels</span> / <span class="flag">--mastering5_eq_transform_levels</span>
+    </summary>
+    <div style="padding-top:.8rem">
+      <p>A 9-band curve (0–2, <strong>1 = neutral</strong>) that restrains how aggressively AM5
+      reshapes each frequency band. Two modes:</p>
+      <ul>
+        <li><strong>Ceiling</strong> — scales the optimizer's per-band wet-gain upper bound
+        (soft penalty in the cost function). Below 1: the optimizer is penalised for boosting
+        that band. Above 1: it is allowed more room.</li>
+        <li><strong>Transform</strong> — scales the realized post-optimization wet-gain
+        (deterministic multiplicative). Below 1: the output is pulled back toward neutral
+        regardless of what the optimizer chose.</li>
+        <li><strong>Ceiling + Transform</strong> — applies both simultaneously.</li>
+        <li><strong>Symmetric transform</strong> — if on, Transform also scales cuts (not just
+        boosts). Without it, only boosts are scaled — cuts are unaffected.</li>
+      </ul>
+      <p>The curve is only sent to the engine when at least one band differs from 1.0.</p>
+    </div>
+  </details>
+
+  <details style="margin-top:.6rem">
+    <summary style="cursor:pointer;color:var(--muted);font-size:.9rem">Diagnostic: Limiter only
+      <span class="flag">--mastering false</span></summary>
+    <div style="padding-top:.8rem">
+      <p>Skips AM5 entirely and runs only the phase limiter + ceiling. Use for A/B diagnosis:
+      if the track sounds clean in Limiter-only mode but artifacts appear with AM5 on, the
+      reference-matching is the culprit — lower Intensity. Not a production mode.</p>
+    </div>
+  </details>
+</section>
+
+<section class="card" id="en-3">
+  <div class="card-head"><span class="step">3</span><h2>Pre-compression</h2>
+    <span class="muted">tames pumping before the limiter</span></div>
+  <p>A loudness-domain compressor that runs <em>before</em> the phase limiter. It evens out the
+  loudest moments so the limiter receives a more consistent level, reducing the per-hit crunch
+  and pumping in the final output.</p>
+
+  <h3>Enabled <span class="flag">--pre_compression</span></h3>
+  <p><b>Default: on.</b> When off, the signal goes from AM5 straight into the limiter with full
+  dynamics. Disable it to preserve transient impact, or when pumping is caused by this stage.</p>
+
+  <h3>Threshold offset <span class="flag">--pre_compression_threshold</span></h3>
+  <p class="meta"><b>Range:</b> 0 … 18 dB &nbsp;·&nbsp; <b>Default:</b> +6 dB above measured loudness</p>
+  <p>How many dB above the track's measured integrated loudness the compressor activates.
+  Higher offset = it activates less often = more dynamics, less pumping.</p>
+
+  <h3>Window <span class="flag">--pre_compression_mean_sec</span></h3>
+  <p class="meta"><b>Range:</b> 0.05 … 1.0 s &nbsp;·&nbsp; <b>Default:</b> 0.2 s</p>
+  <p>Averaging window for the loudness measurement driving the compressor. A <span class="rec">longer
+  window (~0.4 s)</span> gives a smoother, slower action that reduces pumping artifacts. A shorter
+  window reacts faster and is more effective at catching sharp transients.</p>
+</section>
+
+<section class="card" id="en-4">
+  <div class="card-head"><span class="step">4</span><h2>Phase limiter</h2>
+    <span class="muted">the crunch stage — FFT optimizer</span></div>
+  <p>The phase limiter is an iterative FISTA optimizer working in the frequency domain. It finds
+  the smallest-error modification to the spectrum that brings all samples below the ceiling. This
+  is the primary source of <em>crunch</em> and transient smearing — more resources = fewer
+  artifacts.</p>
+
+  <h3>Oversampling <span class="flag">--limiter_internal_oversample</span></h3>
+  <p class="meta"><b>Options:</b> 1× / 2× / 4× &nbsp;·&nbsp; <b>Default:</b> 1×</p>
+  <p>The limiter operates at the file's native sample rate (usually 44.1 kHz). Hard limiting at
+  that rate creates inter-sample aliasing — a harsh metallic crunch. Oversampling temporarily
+  raises the rate so aliasing artifacts fold back above audible range.</p>
+  <ul>
+    <li><strong>1×</strong> — fastest; audible aliasing on transient-heavy material.</li>
+    <li><strong>2×</strong> — <span class="rec">recommended for final masters</span>; removes most aliasing.</li>
+    <li><strong>4×</strong> — cleanest; significant CPU and RAM increase.</li>
+  </ul>
+
+  <h3>Quality (iterations) <span class="flag">--max_iter1</span></h3>
+  <p class="meta"><b>Range:</b> 40 … 400 &nbsp;·&nbsp; <b>Default:</b> 100</p>
+  <p>Number of FISTA iterations. Too few = the optimizer does not converge fully → audible error
+  (residual crunch) and pre-ringing (transient smearing before each loud peak).
+  <span class="rec">Try 200</span> for final masters. 400 is very slow but maximally accurate.</p>
+</section>
+
+<section class="card" id="en-5">
+  <div class="card-head"><span class="step">5</span><h2>Ceiling</h2>
+    <span class="muted">true-peak headroom</span></div>
+
+  <h3>True-peak ceiling <span class="flag">--ceiling</span></h3>
+  <p class="meta"><b>Range:</b> −3.0 … 0.0 dB &nbsp;·&nbsp; <b>Default:</b> −1.0 dB</p>
+  <p>The maximum allowed inter-sample true-peak level. Setting it to 0 dBFS means that after
+  MP3 or AAC encoding, reconstructed samples can exceed 0 dBFS and clip in the decoder →
+  audible clicks. <span class="rec">−1.0 dB</span> provides 1 dB of headroom and eliminates
+  most encoder-induced true-peak clipping. For Spotify/YouTube compliance, −1.0 to −1.5 dB
+  is standard.</p>
+</section>
+
+<section class="card" id="en-6">
+  <div class="card-head"><span class="step">6</span><h2>Section-aware mastering</h2>
+    <span class="muted">gentle blend for quiet parts</span></div>
+
+  <p>AM5 is optimised against the whole-song statistics — dominated by the loud sections. During
+  quiet intros, breaks, and outros, it tries to match a "loud-section reference," often
+  over-boosting empty frequency bands → distortion on sparse material. Section-aware mastering
+  solves this by blending quiet sections toward the <em>dry</em> (unprocessed) signal in a single
+  engine pass.</p>
+
+  <h3>Blend quiet sections toward dry signal <span class="flag">--mastering5_section_ranges</span></h3>
+  <p>Master checkbox. When enabled and at least one section exists, the engine uses the section
+  list and section intensity setting. The sections are detected automatically from the loudness
+  timeline, or drawn manually.</p>
+
+  <div class="sub">
+    <h4>Loudness timeline &amp; sections</h4>
+    <p>After analysis, a chart shows the track's short-term loudness over time. Shaded bands
+    mark detected or manually drawn quiet sections. Click anywhere on the chart to place a
+    <em>playhead</em> — then use <strong>▶ Play from here</strong> to audition that part of the
+    track from your default audio player.</p>
+    <h4>Drawing sections manually</h4>
+    <p>Click <strong>+ Draw section</strong> to enter draw mode (cursor becomes a crosshair).
+    Then click and drag on the timeline to define a new section. Release the mouse to commit it
+    (minimum width: 1 second). To cancel without drawing, click <strong>✕ Cancel</strong>.</p>
+    <p>Sections are also editable in the list below the chart — each entry shows start and end
+    times with a <strong>Remove</strong> button.</p>
+  </div>
+
+  <h3>Section intensity <span class="flag">--mastering5_section_intensity</span></h3>
+  <p class="meta"><b>Range:</b> 0.0 … 1.0 &nbsp;·&nbsp; <b>Default:</b> 0.75</p>
+  <p>Controls the wet/dry blend strength inside the marked sections:</p>
+  <ul>
+    <li><strong>1.0</strong> — full AM5 processing (same as normal, no blending).</li>
+    <li><strong>0.75</strong> — 75% AM5 + 25% dry; gentle reduction.</li>
+    <li><strong>0.0</strong> — fully dry (unprocessed) inside sections.</li>
+  </ul>
+  <p>A <strong>1-second raised-cosine ramp</strong> is applied at each section boundary to
+  prevent clicks and audible transitions. The blend happens in a single engine pass — no
+  re-rendering or splicing.</p>
+  <div class="note">Typical starting point: <span class="rec">0.15–0.40</span> for heavily
+  over-processed intros. For subtle reduction, try 0.60–0.75.</div>
+</section>
+
+<section class="card" id="en-analysis">
+  <div class="card-head"><h2>Analysis &amp; comparison</h2></div>
+
+  <h3>Analyze button</h3>
+  <p>Opens a file picker and runs full analysis on the selected track using
+  <code>audio_analyzer</code> (non-WAV files are decoded via <code>ffmpeg</code> first). The
+  analysis runs in a background goroutine so the UI stays fully responsive during the
+  potentially long analysis (the progress bar animates at the top of the window). When
+  finished:</p>
+  <ul>
+    <li>The per-band spectrum chart in Card 2 is filled.</li>
+    <li>The controls are updated with glitch-avoiding suggested values (loudness, intensity,
+    section ranges, section intensity, preserve bass).</li>
+    <li>The analysis drawer opens with full metrics.</li>
+  </ul>
+
+  <h3>Analysis drawer (Analysis ▾)</h3>
+  <p>The side drawer shows metrics from the last analyzed file:</p>
+  <ul>
+    <li><strong>Integrated LUFS</strong> — average loudness of the whole track.</li>
+    <li><strong>True-peak</strong> — highest inter-sample peak (dBTP).</li>
+    <li><strong>LRA</strong> — Loudness Range; the dynamic spread between quiet and loud passages.</li>
+    <li><strong>Dynamics</strong> — a peak-to-loudness measure of transient presence.</li>
+    <li><strong>Sample rate</strong> and <strong>Duration</strong>.</li>
+    <li><strong>Spectrogram</strong> — time-frequency energy map with Hz labels on the Y axis
+    (20 kHz at top, 0 Hz at bottom) and time on the X axis. Click the ⤢ button or the image
+    to open it full-screen in the lightbox.</li>
+  </ul>
+
+  <h3>Spectrogram lightbox</h3>
+  <p>Click any spectrogram image (in the drawer or in the job comparison) to open it full-screen.
+  The lightbox shows the image at native resolution with the frequency axis (Hz labels) on the
+  left and the time axis at the bottom. Press <strong>Esc</strong> or click the backdrop to close.</p>
+
+  <h3>Mastering comparison (job result)</h3>
+  <p>Expand a finished job in the queue to see the before/after comparison:</p>
+  <ul>
+    <li><strong>Metrics</strong> — input vs output LUFS, true-peak, LRA with deltas.</li>
+    <li><strong>Per-band EQ chart</strong> — the dB change AM5 applied in each of the 9 bands,
+    with the delta value printed under each band name.</li>
+    <li><strong>Loudness over time</strong> — short-term loudness of input and output overlaid.</li>
+    <li><strong>Input / Output spectrograms</strong> — side by side, both zoomable.</li>
+  </ul>
+</section>
+
+<section class="card" id="en-symptoms">
+  <div class="card-head"><h2>Symptom → fix</h2><span class="muted">cheat sheet</span></div>
+  <table>
+    <thead><tr><th>What you hear</th><th>First fix</th><th>Then</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="pill clicks">Clicks / crackles</span></td>
+        <td>Ceiling → <b>−1.0 dB</b></td>
+        <td>Output as WAV; avoid MP3 at 0 dBFS</td>
+      </tr>
+      <tr>
+        <td><span class="pill crunch">Crunch on peaks</span></td>
+        <td>Oversampling → <b>2×</b></td>
+        <td>Quality → <b>200</b>; lower Target loudness (try −14)</td>
+      </tr>
+      <tr>
+        <td><span class="pill pump">Pumping / breathing</span></td>
+        <td>Pre-comp window → <b>0.4 s</b></td>
+        <td>Raise threshold offset; or disable pre-compression</td>
+      </tr>
+      <tr>
+        <td><span class="pill smear">Smearing / loss of clarity</span></td>
+        <td>Quality → <b>200</b></td>
+        <td>Lower Intensity (try 0.3)</td>
+      </tr>
+      <tr>
+        <td><span class="pill tone">Wrong tone — too bright/dark</span></td>
+        <td>Enable EQ correction → drag the band(s)</td>
+        <td>Watch the dashed-red prediction; verify in comparison</td>
+      </tr>
+      <tr>
+        <td><span class="pill crunch">Distortion on quiet intro / break</span></td>
+        <td>Section-aware + section intensity 0.15–0.40</td>
+        <td>Draw sections manually if auto-detection missed them</td>
+      </tr>
+      <tr>
+        <td>Kick deformation / hi-hat over-widening</td>
+        <td>Per-band optimizer: lower Sub/Low (kick) or High/V-hi/Air (hi-hats)</td>
+        <td>Lower Stereo match to 0.5–0.7</td>
+      </tr>
+      <tr>
+        <td>Track sounds over-processed / generic</td>
+        <td>Lower Intensity to 0.2–0.3</td>
+        <td>Lower Stereo match; use EQ correction instead of AM5 for tone</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">Change <strong>one</strong> parameter at a time and compare by ear — otherwise
+  it is impossible to tell what actually helped. Use the before/after comparison panel.</div>
+</section>
+
+</div><!-- /content-en -->
+
+
+<!-- ======================================================== POLISH ======================================================== -->
+<div id="content-pl" class="lang-content">
+
+<div class="toc">
+  <h3>Spis treści</h3>
+  <ol>
+    <li><a href="#pl-files">Pliki — wejście &amp; wyjście</a></li>
+    <li><a href="#pl-1">1 · Docelowa głośność</a></li>
+    <li><a href="#pl-2">2 · AutoMastering5 — ton &amp; stereo</a></li>
+    <li><a href="#pl-3">3 · Pre-kompresja</a></li>
+    <li><a href="#pl-4">4 · Phase limiter</a></li>
+    <li><a href="#pl-5">5 · Sufit</a></li>
+    <li><a href="#pl-6">6 · Mastering świadomy sekcji</a></li>
+    <li><a href="#pl-analysis">Analiza i porównanie</a></li>
+    <li><a href="#pl-symptoms">Objaw → lekarstwo</a></li>
+  </ol>
+</div>
+
+<section class="card" id="pl-files">
+  <div class="card-head"><h2>Pliki — wejście &amp; wyjście</h2></div>
+
+  <h3>Pliki wejściowe</h3>
+  <p>Przeciągnij pliki audio na strefę zrzucania lub kliknij <strong>+ Add files</strong>.
+  Obsługiwane formaty: WAV, FLAC, MP3, AIFF i wszystko, co <code>ffmpeg</code> potrafi zdekodować.
+  Wiele plików jest przetwarzanych jako kolejka — każdy dostaje osobne zadanie masteringu.</p>
+
+  <h3>Folder wyjściowy</h3>
+  <p>Folder, do którego trafiają zmasterowane pliki. Domyślnie katalog Pobrane.
+  Kliknij <strong>Browse</strong>, żeby wybrać inną lokalizację. Folder wyjściowy jest wspólny
+  dla wszystkich zadań w bieżącej sesji.</p>
+
+  <h3>Nazwa pliku wyjściowego</h3>
+  <p>Używana tylko gdy w kolejce jest jeden plik. Przy wielu plikach każdy wyjściowy dostaje
+  sufiks <code>_output.wav</code> do oryginalnej nazwy.</p>
+</section>
+
+<section class="card" id="pl-1">
+  <div class="card-head"><span class="step">1</span><h2>Docelowa głośność</h2>
+    <span class="muted">największa dźwignia</span></div>
+
+  <h3>Target loudness <span class="flag">--reference</span></h3>
+  <p class="meta"><b>Zakres:</b> −20 … 0 LUFS &nbsp;·&nbsp; <b>Domyślnie:</b> −14 LUFS &nbsp;·&nbsp;
+    <b>Zalecane:</b> <span class="rec">−9 do −14 LUFS</span></p>
+  <p>Określa, jak głośno silnik wyrówna utwór przed phase limiterem. Jest to najważniejsza
+  pojedyncza kontrolka. Niższe wartości (np. −14) oznaczają mniejsze wzmocnienie trafiające
+  w limiter, co bezpośrednio redukuje chrupanie, pompowanie i trzaski true-peak.</p>
+  <ul>
+    <li><strong>−9 LUFS</strong> — norma głośności streamingowej; mało zapasu, mocne limitowanie.</li>
+    <li><strong>−14 LUFS</strong> — norma YouTube/Spotify; komfortowa dynamika, mniej chrupania.</li>
+    <li><strong>−18 lub ciszej</strong> — mastering do dalszego łańcucha / archiwum.</li>
+  </ul>
+  <div class="note">Słyszysz chrupanie lub pompowanie? <strong>Najpierw obniż tę wartość</strong>
+  (spróbuj −14 do −16), zanim dotkniesz czegokolwiek innego.</div>
+</section>
+
+<section class="card" id="pl-2">
+  <div class="card-head"><span class="step">2</span><h2>AutoMastering5</h2>
+    <span class="muted">kształtowanie tonu i stereo</span></div>
+  <p>AutoMastering5 (AM5) to rdzeń AI silnika. Jest to kompresja mid/side per-pasmo, której
+  parametry wyznacza optymalizacja różnicowo-ewolucyjna dopasowując utwór do wyuczonego
+  wzorca (<code>mastering_reference.json</code>). Dostosowuje balans tonalny i szerokość stereo
+  względem wzorca, niezależnie od docelowej głośności.</p>
+
+  <h3>Intensywność (Intensity) <span class="flag">--mastering5_mastering_level</span></h3>
+  <p class="meta"><b>Zakres:</b> 0,0 … 1,0 &nbsp;·&nbsp; <b>Domyślnie:</b> 0,4 &nbsp;·&nbsp;
+    <b>Zalecane:</b> <span class="rec">0,3–0,5</span></p>
+  <p>Jak mocno AM5 przekształca utwór w stronę wyuczonego wzorca tonu i dynamiki.</p>
+  <ul>
+    <li><strong>0</strong> — AM5 nie ma efektu (działa, ale wyjście = wejście).</li>
+    <li><strong>0,4</strong> — delikatne kształtowanie; oryginalny charakter zachowany.</li>
+    <li><strong>1,0</strong> — maksymalne dopasowanie do wzorca; silna koloryzacja brzmienia.</li>
+  </ul>
+  <p>Intensywność skaluje też korekcję EQ poniżej: Twoja modyfikacja per pasmo jest mnożona przez
+  intensywność wewnątrz silnika (przycięta do ±6 dB).</p>
+
+  <h3>Dopasowanie stereo (Stereo match) <span class="flag">--mastering_ms_matching_level</span></h3>
+  <p class="meta"><b>Zakres:</b> 0,0 … 1,0 &nbsp;·&nbsp; <b>Domyślnie:</b> 1,0</p>
+  <p>Jak mocno AM5 przekształca pole stereo (balans mid/side per pasmo) w stronę wzorca.
+  Przy 1,0 szerokość stereo per pasmo jest w pełni dopasowywana. Obniżenie do
+  <span class="rec">0,5–0,7</span> zachowuje więcej oryginalnego obrazu stereo i redukuje
+  nadmierne poszerzanie hihatsów lub rozmywanie przestrzeni na rzadkim materiale.</p>
+
+  <h3>Korekcja EQ (per pasmo) <span class="flag">--eq_analysis_target</span></h3>
+  <p>Po dodaniu pliku silnik analizuje widmo per pasmo i rysuje <strong>czerwoną krzywą</strong>
+  (bieżący poziom Twojego utworu per pasmo). Włącz <em>EQ correction</em>, żeby aktywować edytor:</p>
+  <ul>
+    <li><strong>Różowa krzywa</strong> — Twoja pożądana modyfikacja w dB (±12 dB per pasmo).
+    Przeciągnij ją w górę lub dół, żeby wzmocnić lub osłabić dane pasmo częstotliwości.</li>
+    <li><strong>Czerwona przerywana krzywa + czerwone wypełnienie</strong> — przewidywany
+    zastosowany efekt: <code>modyfikacja × intensywność</code>, przycięty do ±6 dB. To jest to,
+    co silnik faktycznie zastosuje. Ruch suwakiem Intensywności aktualizuje podgląd na żywo.</li>
+    <li><strong>Częstotliwość środkowa</strong> każdego pasma jest wyświetlana pod jego nazwą.</li>
+  </ul>
+  <p>Silnik stosuje ten statyczny zysk per pasmo <em>po</em> AM5 i <em>przed</em>
+  pre-kompresją. GUI wysyła surową tablicę modyfikacji; skalowanie przez intensywność i
+  przycięcie ±6 dB dzieje się wewnątrz silnika.</p>
+  <div class="note warn-note"><b>Uwaga:</b> wzmacnianie pustego pasma (np. +12 dB Air na
+  utworze z bardzo małą ilością wysokich) walczy z limiterem i może <em>pogorszyć</em> artefakty.
+  Sprawdź porównanie przed/po po każdej zmianie EQ.</div>
+
+  <div class="sub">
+    <h4>Częstotliwości środkowe pasm</h4>
+    <table>
+      <thead><tr><th>Pasmo</th><th>Częst. środkowa</th><th>Kiedy modyfikować</th></tr></thead>
+      <tbody>
+        <tr><td>Sub</td><td>~54 Hz</td><td>Wzmocnij dla głębszego basu; obetnij gdy bas jest mętny</td></tr>
+        <tr><td>Low</td><td>~240 Hz</td><td>Wzmocnij dla ciepła; obetnij gdy korpus stopy jest napęczniały</td></tr>
+        <tr><td>Lo-mid</td><td>~560 Hz</td><td>Obetnij gdy miks brzmi pudełkowato</td></tr>
+        <tr><td>Mid</td><td>~1,1 kHz</td><td>Obecność i ciało instrumentów</td></tr>
+        <tr><td>Up-mid</td><td>~1,9 kHz</td><td>Agresja, przebicie gitary</td></tr>
+        <tr><td>Pres</td><td>~3,3 kHz</td><td>Obetnij gdy wokale są szorstkie</td></tr>
+        <tr><td>High</td><td>~5,6 kHz</td><td>Obetnij gdy talerze są przejaskrawione</td></tr>
+        <tr><td>V-hi</td><td>~9,4 kHz</td><td>Obetnij gdy hihatsy rozmywają się lub nadmiernie się poszerzają</td></tr>
+        <tr><td>Air</td><td>~16 kHz</td><td>Wzmocnij dla powietrza na jasnym materiale</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Zachowaj bas (Preserve bass) <span class="flag">--erb_eval_func_weighting</span></h3>
+  <p>Stosuje percepcyjne ważenie w phase limiterze chroniące niskie częstotliwości przed
+  nadmiernym ograniczaniem. Trzymaj włączone dla większości muzyki — szczególnie gatunków
+  z dominującym basem.</p>
+
+  <details style="margin-top:1rem">
+    <summary style="cursor:pointer;color:var(--muted);font-size:.9rem">Zaawansowane: optymalizator per pasmo
+      <span class="flag">--mastering5_eq_band_levels</span> / <span class="flag">--mastering5_eq_transform_levels</span>
+    </summary>
+    <div style="padding-top:.8rem">
+      <p>Krzywa 9-pasmowa (0–2, <strong>1 = neutralnie</strong>) ograniczająca agresywność
+      AM5 per pasmo. Dwa tryby:</p>
+      <ul>
+        <li><strong>Ceiling (sufit)</strong> — skaluje górną granicę wet-gain optymalizatora per pasmo
+        (miękka kara w funkcji kosztu). Poniżej 1: optymalizator jest karany za wzmacnianie pasma.
+        Powyżej 1: dostaje więcej swobody.</li>
+        <li><strong>Transform</strong> — skaluje zrealizowany wet-gain po optymalizacji
+        (deterministyczne mnożenie). Poniżej 1: wyjście jest cofane w stronę neutralności
+        niezależnie od wyboru optymalizatora.</li>
+        <li><strong>Ceiling + Transform</strong> — oba jednocześnie.</li>
+        <li><strong>Symmetric transform</strong> — gdy włączony, Transform skaluje też cięcia
+        (nie tylko wzmocnienia). Bez tego cięcia nie są skalowane.</li>
+      </ul>
+      <p>Krzywa jest wysyłana do silnika tylko gdy co najmniej jedno pasmo różni się od 1,0.</p>
+    </div>
+  </details>
+
+  <details style="margin-top:.6rem">
+    <summary style="cursor:pointer;color:var(--muted);font-size:.9rem">Diagnostyka: tylko limiter
+      <span class="flag">--mastering false</span></summary>
+    <div style="padding-top:.8rem">
+      <p>Pomija AM5 całkowicie i uruchamia tylko phase limiter + sufit. Tryb diagnostyczny A/B:
+      jeśli utwór brzmi czysto w trybie Limiter-only, ale artefakty pojawiają się z AM5 —
+      dopasowanie do wzorca jest winowajcą → obniż Intensywność. Nie jest to tryb produkcyjny.</p>
+    </div>
+  </details>
+</section>
+
+<section class="card" id="pl-3">
+  <div class="card-head"><span class="step">3</span><h2>Pre-kompresja</h2>
+    <span class="muted">tłumi pompowanie przed limiterem</span></div>
+  <p>Kompresor głośnościowy działający <em>przed</em> phase limiterem. Wyrównuje najgłośniejsze
+  momenty, żeby limiter otrzymywał bardziej stabilny poziom, co redukuje pompowanie i chrupanie
+  per uderzenie na wyjściu.</p>
+
+  <h3>Włączona (Enabled) <span class="flag">--pre_compression</span></h3>
+  <p><b>Domyślnie: włączona.</b> Gdy wyłączona, sygnał przechodzi z AM5 prosto do limitera
+  z pełną dynamiką. Wyłącz ją by zachować uderzenie transjentów albo gdy pompowanie pochodzi
+  z tego etapu.</p>
+
+  <h3>Próg — offset (Threshold offset) <span class="flag">--pre_compression_threshold</span></h3>
+  <p class="meta"><b>Zakres:</b> 0 … 18 dB &nbsp;·&nbsp; <b>Domyślnie:</b> +6 dB ponad zmierzoną głośność</p>
+  <p>O ile dB ponad zmierzoną zintegrowaną głośność utworu kompresor zaczyna działać.
+  Wyższy offset = aktywuje się rzadziej = więcej dynamiki, mniej pompowania.</p>
+
+  <h3>Okno (Window) <span class="flag">--pre_compression_mean_sec</span></h3>
+  <p class="meta"><b>Zakres:</b> 0,05 … 1,0 s &nbsp;·&nbsp; <b>Domyślnie:</b> 0,2 s</p>
+  <p>Okno uśredniania głośności sterujące kompresorem. <span class="rec">Dłuższe okno (~0,4 s)</span>
+  daje płynniejsze, wolniejsze działanie i redukuje pompowanie. Krótsze okno reaguje szybciej
+  i jest skuteczniejsze przy ostrych transjentach.</p>
+</section>
+
+<section class="card" id="pl-4">
+  <div class="card-head"><span class="step">4</span><h2>Phase limiter</h2>
+    <span class="muted">etap chrupania — optymalizator FFT</span></div>
+  <p>Phase limiter to iteracyjny optymalizator FISTA działający w domenie częstotliwości.
+  Szuka modyfikacji widma o minimalnym błędzie, która sprowadza wszystkie próbki poniżej sufitu.
+  To jest główne źródło <em>chrupania</em> i rozmywania transjentów — więcej zasobów = mniej
+  artefaktów.</p>
+
+  <h3>Nadpróbkowanie (Oversampling) <span class="flag">--limiter_internal_oversample</span></h3>
+  <p class="meta"><b>Opcje:</b> 1× / 2× / 4× &nbsp;·&nbsp; <b>Domyślnie:</b> 1×</p>
+  <p>Limiter działa przy natywnej częstotliwości próbkowania pliku (zwykle 44,1 kHz). Twarde
+  limitowanie przy tej częstotliwości tworzy aliasing — metaliczne chrupanie. Nadpróbkowanie
+  tymczasowo podnosi częstotliwość, żeby artefakty aliasingowe zwinęły się powyżej słyszalnego
+  zakresu.</p>
+  <ul>
+    <li><strong>1×</strong> — najszybsze; słyszalny aliasing na materiale bogatym w transjenty.</li>
+    <li><strong>2×</strong> — <span class="rec">zalecane na finalne mastery</span>; usuwa większość aliasingów.</li>
+    <li><strong>4×</strong> — najczystsze; znaczny wzrost CPU i RAM.</li>
+  </ul>
+
+  <h3>Jakość — iteracje (Quality) <span class="flag">--max_iter1</span></h3>
+  <p class="meta"><b>Zakres:</b> 40 … 400 &nbsp;·&nbsp; <b>Domyślnie:</b> 100</p>
+  <p>Liczba iteracji FISTA. Za mało = optymalizator nie zbiega w pełni → słyszalny błąd (resztkowe
+  chrupanie) i pre-ringing (rozmywanie transjentów przed każdym głośnym szczytem).
+  <span class="rec">Spróbuj 200</span> na finalne mastery. 400 jest bardzo wolne, ale maksymalnie
+  dokładne.</p>
+</section>
+
+<section class="card" id="pl-5">
+  <div class="card-head"><span class="step">5</span><h2>Sufit</h2>
+    <span class="muted">zapas true-peak</span></div>
+
+  <h3>Sufit true-peak <span class="flag">--ceiling</span></h3>
+  <p class="meta"><b>Zakres:</b> −3,0 … 0,0 dB &nbsp;·&nbsp; <b>Domyślnie:</b> −1,0 dB</p>
+  <p>Maksymalny dozwolony poziom true-peak między próbkami. Ustawienie 0 dBFS oznacza, że
+  po kodowaniu MP3 lub AAC zrekonstruowane próbki mogą przekroczyć 0 dBFS i obciąć się
+  w dekoderze → słyszalne trzaski. <span class="rec">−1,0 dB</span> daje 1 dB zapasu i eliminuje
+  większość trzasków wywołanych przez koder. Dla Spotify/YouTube standard to −1,0 do −1,5 dB.</p>
+</section>
+
+<section class="card" id="pl-6">
+  <div class="card-head"><span class="step">6</span><h2>Mastering świadomy sekcji</h2>
+    <span class="muted">delikatny blend dla cichych fragmentów</span></div>
+
+  <p>AM5 jest optymalizowane względem statystyk całego utworu — zdominowanych przez głośne
+  sekcje. Podczas cichych intro, breaków i outro próbuje dopasować „wzorzec głośnych sekcji",
+  często nadmiernie wzmacniając puste pasma częstotliwości → zniekształcenia na rzadkim materiale.
+  Mastering świadomy sekcji rozwiązuje to, mieszając ciche fragmenty w stronę sygnału <em>dry</em>
+  (nieprzetworzonego) w jednym przebiegu silnika.</p>
+
+  <h3>Mieszaj ciche sekcje w stronę dry <span class="flag">--mastering5_section_ranges</span></h3>
+  <p>Główny checkbox. Gdy włączony i istnieje co najmniej jedna sekcja, silnik używa listy sekcji
+  i ustawienia intensywności sekcji. Sekcje są wykrywane automatycznie z wykresu głośności lub
+  rysowane ręcznie.</p>
+
+  <div class="sub">
+    <h4>Wykres głośności i sekcje</h4>
+    <p>Po analizie wykres pokazuje krótkoterminową głośność w czasie. Zacienione pasy oznaczają
+    wykryte lub ręcznie narysowane ciche sekcje. Kliknij w dowolnym miejscu wykresu, żeby
+    umieścić <em>głowicę odtwarzania</em> — a potem użyj <strong>▶ Play from here</strong>,
+    żeby odsłuchać ten fragment z domyślnego odtwarzacza.</p>
+    <h4>Rysowanie sekcji ręcznie</h4>
+    <p>Kliknij <strong>+ Draw section</strong>, żeby wejść w tryb rysowania (kursor staje się
+    celownikiem). Następnie kliknij i przeciągnij na wykresie, żeby zdefiniować nową sekcję.
+    Zwolnij mysz, żeby zatwierdzić (minimalna szerokość: 1 sekunda). Żeby anulować bez rysowania,
+    kliknij <strong>✕ Cancel</strong>.</p>
+    <p>Sekcje można też edytować na liście pod wykresem — każdy wpis pokazuje czas startu i końca
+    oraz przycisk <strong>Remove</strong>.</p>
+  </div>
+
+  <h3>Intensywność sekcji (Section intensity) <span class="flag">--mastering5_section_intensity</span></h3>
+  <p class="meta"><b>Zakres:</b> 0,0 … 1,0 &nbsp;·&nbsp; <b>Domyślnie:</b> 0,75</p>
+  <p>Kontroluje siłę blendu wet/dry wewnątrz zaznaczonych sekcji:</p>
+  <ul>
+    <li><strong>1,0</strong> — pełne przetwarzanie AM5 (tak samo jak normalnie, bez mieszania).</li>
+    <li><strong>0,75</strong> — 75% AM5 + 25% dry; delikatna redukcja.</li>
+    <li><strong>0,0</strong> — całkowicie dry (nieprzetworzone) wewnątrz sekcji.</li>
+  </ul>
+  <p><strong>Rampa 1 sekundy (raised-cosine)</strong> jest stosowana na każdej granicy sekcji,
+  żeby zapobiec kliknięciom i słyszalnym przejściom. Blend odbywa się w jednym przebiegu silnika
+  — bez re-renderowania ani sklejania.</p>
+  <div class="note">Typowy punkt startowy: <span class="rec">0,15–0,40</span> dla mocno
+  przetworzonych intro. Przy subtelnej redukcji spróbuj 0,60–0,75.</div>
+</section>
+
+<section class="card" id="pl-analysis">
+  <div class="card-head"><h2>Analiza i porównanie</h2></div>
+
+  <h3>Przycisk Analyze</h3>
+  <p>Otwiera okno wyboru pliku i uruchamia pełną analizę wybranego utworu przy użyciu
+  <code>audio_analyzer</code> (pliki inne niż WAV są wcześniej dekodowane przez <code>ffmpeg</code>).
+  Analiza działa w tle (goroutine), więc UI pozostaje w pełni responsywne podczas potencjalnie
+  długiej analizy (pasek postępu animuje się na górze okna). Po zakończeniu:</p>
+  <ul>
+    <li>Wykres widma per pasmo w Karcie 2 zostaje wypełniony.</li>
+    <li>Kontrolki zostają zaktualizowane z sugerowanymi wartościami unikającymi glitchy
+    (głośność, intensywność, zakresy sekcji, intensywność sekcji, zachowaj bas).</li>
+    <li>Panel boczny analizy otwiera się z pełnymi metrykami.</li>
+  </ul>
+
+  <h3>Panel analizy (Analysis ▾)</h3>
+  <p>Panel boczny pokazuje metryki z ostatnio analizowanego pliku:</p>
+  <ul>
+    <li><strong>Zintegrowane LUFS</strong> — średnia głośność całego utworu.</li>
+    <li><strong>True-peak</strong> — najwyższy szczyt między próbkami (dBTP).</li>
+    <li><strong>LRA</strong> — Loudness Range; rozpiętość dynamiczna między cichymi i głośnymi fragmentami.</li>
+    <li><strong>Dynamics</strong> — miara transjentów (szczyt do głośności).</li>
+    <li><strong>Sample rate</strong> i <strong>Duration</strong>.</li>
+    <li><strong>Spektrogram</strong> — mapa energii czas-częstotliwość z etykietami Hz na osi Y
+    (20 kHz u góry, 0 Hz u dołu) i czasem na osi X. Kliknij przycisk ⤢ lub sam obraz, żeby
+    otworzyć go na pełnym ekranie w lightboxie.</li>
+  </ul>
+
+  <h3>Lightbox spektrogramu</h3>
+  <p>Kliknij dowolny obraz spektrogramu (w panelu lub w porównaniu zadania), żeby otworzyć go
+  na pełnym ekranie. Lightbox pokazuje obraz w natywnej rozdzielczości z osią częstotliwości
+  (etykiety Hz) po lewej stronie i osią czasu na dole. Naciśnij <strong>Esc</strong> lub kliknij
+  tło, żeby zamknąć.</p>
+
+  <h3>Porównanie masteringu (wynik zadania)</h3>
+  <p>Rozwiń zakończone zadanie w kolejce, żeby zobaczyć porównanie przed/po:</p>
+  <ul>
+    <li><strong>Metryki</strong> — LUFS, true-peak, LRA wejściowe vs wyjściowe z deltami.</li>
+    <li><strong>Wykres EQ per pasmo</strong> — zmiana dB zastosowana przez AM5 w każdym z 9 pasm,
+    z wartością delta wypisaną pod nazwą każdego pasma.</li>
+    <li><strong>Głośność w czasie</strong> — krótkoterminowa głośność wejścia i wyjścia nakładka.</li>
+    <li><strong>Spektrogramy wejście/wyjście</strong> — obok siebie, oba z możliwością powiększenia.</li>
+  </ul>
+</section>
+
+<section class="card" id="pl-symptoms">
+  <div class="card-head"><h2>Objaw → lekarstwo</h2><span class="muted">ściągawka</span></div>
+  <table>
+    <thead><tr><th>Co słyszysz</th><th>Pierwsza zmiana</th><th>Potem</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="pill clicks">Trzaski / kliknięcia</span></td>
+        <td>Sufit → <b>−1,0 dB</b></td>
+        <td>Wyjście jako WAV; unikaj MP3 przy 0 dBFS</td>
+      </tr>
+      <tr>
+        <td><span class="pill crunch">Chrupanie na szczytach</span></td>
+        <td>Nadpróbkowanie → <b>2×</b></td>
+        <td>Jakość → <b>200</b>; obniż Docelową głośność (spróbuj −14)</td>
+      </tr>
+      <tr>
+        <td><span class="pill pump">Pompowanie / oddychanie</span></td>
+        <td>Okno pre-komp. → <b>0,4 s</b></td>
+        <td>Próg wyżej; lub wyłącz pre-kompresję</td>
+      </tr>
+      <tr>
+        <td><span class="pill smear">Rozmycie / utrata klarowności</span></td>
+        <td>Jakość → <b>200</b></td>
+        <td>Obniż Intensywność (spróbuj 0,3)</td>
+      </tr>
+      <tr>
+        <td><span class="pill tone">Zła barwa — za jasno/ciemno</span></td>
+        <td>Włącz EQ correction → przeciągnij pasmo(a)</td>
+        <td>Patrz na czerwoną przerywaną; sprawdź w porównaniu</td>
+      </tr>
+      <tr>
+        <td><span class="pill crunch">Zniekształcenia na cichym intro/breaku</span></td>
+        <td>Section-aware + intensywność sekcji 0,15–0,40</td>
+        <td>Narysuj sekcje ręcznie jeśli auto-detekcja je ominęła</td>
+      </tr>
+      <tr>
+        <td>Deformacja stopy / poszerzanie hihatsów</td>
+        <td>Optymalizator per pasmo: obniż Sub/Low (stopa) lub High/V-hi/Air (hihatsy)</td>
+        <td>Obniż Dopasowanie stereo do 0,5–0,7</td>
+      </tr>
+      <tr>
+        <td>Utwór brzmi przeprocesowany / generycznie</td>
+        <td>Obniż Intensywność do 0,2–0,3</td>
+        <td>Obniż Dopasowanie stereo; używaj EQ correction zamiast AM5 do barwy</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">Zmieniaj <strong>jeden</strong> parametr na raz i porównuj słuchem — inaczej
+  nie da się ustalić co faktycznie pomogło. Używaj panelu porównania przed/po.</div>
+</section>
+
+</div><!-- /content-pl -->
+
+</main>
+
+<footer>
+  <p>phaselimiter-gui · filipszoldra fork ·
+    <a href="https://github.com/filipszoldra/phaselimiter-gui">GitHub</a> ·
+    <a href="https://github.com/filipszoldra/phaselimiter-gui/releases/latest">Download</a>
+  </p>
+  <p style="margin-top:.4rem">DSP engine: <a href="https://github.com/ai-mastering/phaselimiter">ai-mastering/phaselimiter</a>.
+  Flag names match arguments passed to <code>phase_limiter</code> in <code>mastering.go</code>.</p>
+</footer>
+
+<script>
+function setLang(lang) {
+  document.getElementById('content-en').style.display = lang === 'en' ? '' : 'none';
+  document.getElementById('content-pl').style.display = lang === 'pl' ? '' : 'none';
+  document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+  document.getElementById('btnPl').classList.toggle('active', lang === 'pl');
+  document.documentElement.lang = lang;
+  try { localStorage.setItem('pldocs-lang', lang); } catch(e){}
+}
+(function(){
+  var saved;
+  try { saved = localStorage.getItem('pldocs-lang'); } catch(e){}
+  setLang(saved || (navigator.language && navigator.language.startsWith('pl') ? 'pl' : 'en'));
+})();
+</script>
+</body>
+</html>

@@ -174,6 +174,10 @@
       <div class="card-head"><span class="step">6</span><h2>Section-aware mastering <button class="help" type="button" data-help="In marked sections, the AutoMastering5 result is blended toward the dry (unprocessed) signal. Section intensity sets blend strength: 0 = fully dry, 1 = full processing. A 1s raised-cosine ramp at each boundary prevents clicks.">?</button></h2><span class="muted">blend quiet parts</span></div>
       <label class="check"><input id="sectionEnable" type="checkbox" /> <span>Blend quiet sections toward dry signal</span></label>
       <div id="sectionsChart"></div>
+      <div id="secAddRow" class="sec-add-row hidden">
+        <button id="addSectionBtn" class="btn tiny">+ Draw section</button>
+        <span id="addSectionHint" class="muted"></span>
+      </div>
       <div id="secPlayRow" class="sec-play-row hidden">
         <span id="secPlayheadTime" class="muted">Click timeline to place playhead</span>
         <button id="secPlayBtn" class="btn tiny">▶ Play from here</button>
@@ -181,8 +185,8 @@
       <div id="spectrumPanel"></div>
       <div id="sectionsList"></div>
       <label class="field slider">
-        <span class="slider-top">Section intensity <output id="sectionIntensityOut">0.25</output></span>
-        <input id="sectionIntensity" type="range" min="0" max="1" step="0.05" value="0.25" />
+        <span class="slider-top">Section intensity <output id="sectionIntensityOut">0.75</output></span>
+        <input id="sectionIntensity" type="range" min="0" max="1" step="0.05" value="0.75" />
       </label>
     </section>
 
@@ -199,6 +203,11 @@
     <div id="analysisMetrics" class="ab-metrics hidden"></div>
     <div id="analysisSpectro" class="hidden"></div>
   </aside>
+
+  <div id="spectroLightbox" class="hidden">
+    <button id="spectroLightboxClose" type="button" aria-label="Close">×</button>
+    <div id="spectroLightboxContent"></div>
+  </div>
 
   <script src="app.js"></script>
 </body>

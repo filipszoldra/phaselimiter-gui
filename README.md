@@ -85,7 +85,10 @@ phaselimiter/
 5. (Optional) **Advanced: per-band optimizer** to restrain specific bands.
 6. **Master**. When a job finishes, expand **Mastering comparison** for the input/output report.
 
-See the controls reference for every control and the engine flag it maps to:
+Full documentation (EN/PL, language toggle):
+**[filipszoldra.github.io/phaselimiter-gui](https://filipszoldra.github.io/phaselimiter-gui/)**
+
+Or browse the Markdown source:
 - [English controls reference](docs/controls-en.md)
 - [Polski opis sterowania](docs/sterowanie-pl.md)
 
