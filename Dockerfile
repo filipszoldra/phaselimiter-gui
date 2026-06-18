@@ -22,5 +22,9 @@ COPY phaselimiter/ ./phaselimiter/
 # Put bundled .so files on the library search path so the engine finds them at runtime.
 ENV LD_LIBRARY_PATH=/app/phaselimiter/bin
 
+# Verify all shared-library deps are satisfied at build time (shows "not found" in CI logs).
+RUN LD_LIBRARY_PATH=/app/phaselimiter/bin ldd /app/phaselimiter/bin/phase_limiter 2>&1 || true && \
+    LD_LIBRARY_PATH=/app/phaselimiter/bin ldd /app/phaselimiter/bin/audio_analyzer 2>&1 || true
+
 EXPOSE 8080
 CMD ["/app/phaselimiter-server"]

@@ -67,10 +67,17 @@ jobs:
       - name: assemble phaselimiter/ directory for Docker
         run: |
           mkdir -p phaselimiter/bin
-          cp -r engine-artifact/bin/. phaselimiter/bin/ 2>/dev/null || cp engine-artifact/phase_limiter engine-artifact/audio_analyzer phaselimiter/bin/ 2>/dev/null || true
+          # Artifact may be flat (phase_limiter, audio_analyzer, lib*.so* all top-level)
+          # or nested under engine-artifact/bin/. Handle both.
+          if [ -d engine-artifact/bin ] && [ -n "$(ls -A engine-artifact/bin/)" ]; then
+            cp -r engine-artifact/bin/. phaselimiter/bin/
+          else
+            cp -r engine-artifact/. phaselimiter/bin/
+          fi
           chmod +x phaselimiter/bin/phase_limiter phaselimiter/bin/audio_analyzer || true
           echo "=== phaselimiter/bin ==="
           ls -lh phaselimiter/bin/
+          echo "=== .so count: $(ls phaselimiter/bin/*.so* 2>/dev/null | wc -l) ==="
 
       - name: checkout phaselimiter resource files
         env:
