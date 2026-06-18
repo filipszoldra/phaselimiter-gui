@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -98,6 +99,9 @@ func handleUploadChunk() http.HandlerFunc {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		// Bug 13: limit chunk size to 30 MB to prevent OOM.
+		r.Body = http.MaxBytesReader(w, r.Body, 30<<20)
+
 		sessID := r.Header.Get("X-Session-ID")
 		idx, _ := strconv.Atoi(r.Header.Get("X-Chunk-Index"))
 		total, _ := strconv.Atoi(r.Header.Get("X-Total-Chunks"))
@@ -140,6 +144,7 @@ func handleUploadChunk() http.HandlerFunc {
 		sess.files[idx] = tmp.Name()
 		sess.at = time.Now()
 		received := len(sess.files)
+		total = sess.total // use authoritative total from session
 		sess.mu.Unlock()
 
 		if received < total {
@@ -148,8 +153,28 @@ func handleUploadChunk() http.HandlerFunc {
 			return
 		}
 
-		// All chunks received — assemble into one file.
-		chunkSessions.Delete(sessID)
+		// All chunks received — atomically take ownership so only one goroutine assembles.
+		// Bug 3: use LoadAndDelete to prevent double-assembly race.
+		actual, loaded := chunkSessions.LoadAndDelete(sessID)
+		if !loaded {
+			http.Error(w, "session already assembled or expired", http.StatusConflict)
+			return
+		}
+		sess = actual.(*chunkSession)
+
+		// Bug 4: collect all chunk paths up front; defer cleanup regardless of success/failure.
+		sess.mu.Lock()
+		chunkPaths := make([]string, sess.total)
+		for i := 0; i < sess.total; i++ {
+			chunkPaths[i] = sess.files[i]
+		}
+		sess.mu.Unlock()
+		defer func() {
+			for _, p := range chunkPaths {
+				os.Remove(p)
+			}
+		}()
+
 		tok := newToken()
 		outPath := filepath.Join(os.TempDir(), "pl_upload_"+tok+sess.ext)
 		out, err := os.Create(outPath)
@@ -157,31 +182,25 @@ func handleUploadChunk() http.HandlerFunc {
 			http.Error(w, "assemble create: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		var chunkPaths []string
-		for i := 0; i < sess.total; i++ {
-			sess.mu.Lock()
-			p := sess.files[i]
-			sess.mu.Unlock()
-			chunkPaths = append(chunkPaths, p)
-			f, err := os.Open(p)
-			if err != nil {
-				out.Close()
-				os.Remove(outPath)
-				http.Error(w, "open chunk "+strconv.Itoa(i)+": "+err.Error(), http.StatusInternalServerError)
-				return
+		var assembleErr error
+		for i, p := range chunkPaths {
+			f, openErr := os.Open(p)
+			if openErr != nil {
+				assembleErr = fmt.Errorf("open chunk %d: %w", i, openErr)
+				break
 			}
 			_, copyErr := io.Copy(out, f)
 			f.Close()
 			if copyErr != nil {
-				out.Close()
-				os.Remove(outPath)
-				http.Error(w, "assemble chunk "+strconv.Itoa(i)+": "+copyErr.Error(), http.StatusInternalServerError)
-				return
+				assembleErr = fmt.Errorf("copy chunk %d: %w", i, copyErr)
+				break
 			}
 		}
 		out.Close()
-		for _, p := range chunkPaths {
-			os.Remove(p)
+		if assembleErr != nil {
+			os.Remove(outPath)
+			http.Error(w, "assemble: "+assembleErr.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		storeToken(tok, outPath, []string{outPath})
@@ -388,6 +407,11 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 		// Register download token before job completes so it's ready when SSE fires.
 		storeToken(outTok, outPath, []string{inPath, outPath})
 
+		// Bug 5/12: cancel the engine process if the client disconnects.
+		// context.WithCancel wraps r.Context() — cancelled on disconnect OR handler return.
+		jobCtx, cancelJob := context.WithCancel(r.Context())
+		defer cancelJob()
+
 		oversample := settings.LimiterOversample
 		if oversample < 1 {
 			oversample = 1
@@ -400,6 +424,7 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 			PhaselimiterPath:        filepath.Join(execDir, "phaselimiter/bin/phase_limiter"),
 			SoundQuality2Cache:      filepath.Join(execDir, "phaselimiter/resource/sound_quality2_cache"),
 			Status:                  MasteringStatusWaiting,
+			Ctx:                     jobCtx,
 			Loudness:                settings.Loudness,
 			Level:                   settings.Level,
 			BassPreservation:        settings.BassPreservation,

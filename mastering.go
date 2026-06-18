@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"fmt"
+	"log"
 	"math"
 	"os/exec"
 	"regexp"
@@ -47,6 +50,10 @@ type Mastering struct {
 	Sections               []Section
 	SectionIntensity       float64
 	SectionMasteringEnable bool
+
+	// Ctx, if non-nil, is used to kill the engine process (e.g. on client disconnect).
+	// Nil falls back to context.Background().
+	Ctx context.Context
 
 	Progression float64
 	Status      MasteringStatus
@@ -159,7 +166,11 @@ func (m Mastering) execute(update chan Mastering) {
 	args, cleanup := m.buildEngineArgs(m.Input, m.Output, m.Level)
 	defer cleanup()
 
-	cmd := exec.Command(m.PhaselimiterPath, args...)
+	ctx := m.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd := exec.CommandContext(ctx, m.PhaselimiterPath, args...)
 	CmdHideWindow(cmd)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -168,7 +179,9 @@ func (m Mastering) execute(update chan Mastering) {
 		update <- m
 		return
 	}
-	cmd.Stderr = cmd.Stdout
+	// Capture stderr separately so it appears in failure messages and Cloud Run logs.
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
 
 	m.Status = MasteringStatusProcessing
 	update <- m
@@ -192,8 +205,19 @@ func (m Mastering) execute(update chan Mastering) {
 	}
 
 	if err = cmd.Wait(); err != nil {
+		se := strings.TrimSpace(stderrBuf.String())
+		if se != "" {
+			if len(se) > 1000 {
+				se = se[:1000] + "..."
+			}
+			log.Printf("engine stderr [job %d]: %s", m.Id, se)
+		}
+		msg := "command failed: " + err.Error()
+		if se != "" {
+			msg += "; stderr: " + se
+		}
 		m.Status = MasteringStatusFailed
-		m.Message = "command failed: " + err.Error()
+		m.Message = msg
 		update <- m
 		return
 	}
