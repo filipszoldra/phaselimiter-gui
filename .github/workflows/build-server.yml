@@ -66,21 +66,24 @@ jobs:
 
       - name: assemble phaselimiter/ directory for Docker
         run: |
-          # The artifact layout from build-engine-linux.yml:
-          #   engine-artifact/bin/phase_limiter
-          #   engine-artifact/bin/audio_analyzer
-          #   engine-artifact/bin/lib*.so*
           mkdir -p phaselimiter/bin
-          cp -r engine-artifact/bin/. phaselimiter/bin/
+          cp -r engine-artifact/bin/. phaselimiter/bin/ 2>/dev/null || cp engine-artifact/phase_limiter engine-artifact/audio_analyzer phaselimiter/bin/ 2>/dev/null || true
           chmod +x phaselimiter/bin/phase_limiter phaselimiter/bin/audio_analyzer || true
-
-          # Resource files (mastering_reference.json, sound_quality2_cache, analysis_data)
-          # are expected in the engine artifact at engine-artifact/resource/ OR must be
-          # checked out from the phaselimiter repo separately (see note below).
-          # If the artifact doesn't include them, uncomment and adjust:
-          # cp -r engine-artifact/resource phaselimiter/resource
           echo "=== phaselimiter/bin ==="
           ls -lh phaselimiter/bin/
+
+      - name: checkout phaselimiter resource files
+        env:
+          GH_TOKEN: ${{ secrets.GH_PHASELIMITER_TOKEN }}
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://x-access-token:${GH_TOKEN}@github.com/${{ env.ENGINE_REPO }}.git \
+            phaselimiter-src
+          cd phaselimiter-src && git sparse-checkout set resource && cd ..
+          cp -r phaselimiter-src/resource phaselimiter/resource
+          rm -rf phaselimiter-src
+          echo "=== phaselimiter/resource ==="
+          ls -lh phaselimiter/resource/
 
       - name: smoke test server binary
         run: |

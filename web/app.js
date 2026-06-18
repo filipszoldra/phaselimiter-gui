@@ -802,7 +802,10 @@ async function serverStartMastering(req) {
 }
 
 async function _streamOneMasterJob(file, settings) {
+  const label = el("progressLabel");
+  if (label) label.textContent = "Uploading " + baseName(file) + "…";
   const fileToken = await uploadFileChunked(file);
+  if (label) label.textContent = "Queuing…";
   const form = new FormData();
   form.append("fileToken", fileToken);
   form.append("fileName", file.name || "input.wav");
