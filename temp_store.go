@@ -48,6 +48,12 @@ func deleteTokenEntry(token string) {
 	}
 }
 
+// unstoreToken removes the token from the store without deleting any files.
+// Use when transferring ownership of the file to another token's cleanup list.
+func unstoreToken(token string) {
+	tokenStore.Delete(token)
+}
+
 func startTokenGC() {
 	go func() {
 		for {

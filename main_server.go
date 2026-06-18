@@ -45,6 +45,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/reference", handleReference(execDir))
+	mux.HandleFunc("/api/upload-chunk", handleUploadChunk())
 	mux.HandleFunc("/api/analyze", handleAnalyze(an))
 	mux.HandleFunc("/api/analyze-by-token/", handleAnalyzeByToken(an))
 	mux.HandleFunc("/api/master", handleMaster(&runner, execDir, ffmpeg, &nextID, &nextIDMu))

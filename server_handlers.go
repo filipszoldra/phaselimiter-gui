@@ -11,8 +11,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // jobWatcher fans out MasteringUpdate broadcasts to per-job channels so each
@@ -48,6 +50,143 @@ func (w *jobWatcher) dispatch(m Mastering) {
 	select {
 	case ch <- m:
 	default: // drop if buffer full; shouldn't happen with capacity 200
+	}
+}
+
+// chunkSession tracks in-progress chunked file uploads.
+type chunkSession struct {
+	ext   string
+	total int
+	files map[int]string
+	mu    sync.Mutex
+	at    time.Time
+}
+
+var chunkSessions sync.Map
+
+// handleUploadChunk receives raw binary chunks one at a time.
+// Headers: X-Session-ID (empty on first chunk), X-Chunk-Index, X-Total-Chunks, X-File-Ext.
+// Body: application/octet-stream — one chunk (<= 25 MB).
+// Returns {"sessionId":"..."} until all chunks arrive, then adds "fileToken" to the response.
+func handleUploadChunk() http.HandlerFunc {
+	go func() {
+		for range time.Tick(10 * time.Minute) {
+			chunkSessions.Range(func(k, v any) bool {
+				s := v.(*chunkSession)
+				s.mu.Lock()
+				old := time.Since(s.at) > 30*time.Minute
+				var stale []string
+				if old {
+					for _, p := range s.files {
+						stale = append(stale, p)
+					}
+				}
+				s.mu.Unlock()
+				if old {
+					for _, p := range stale {
+						os.Remove(p)
+					}
+					chunkSessions.Delete(k)
+				}
+				return true
+			})
+		}
+	}()
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		sessID := r.Header.Get("X-Session-ID")
+		idx, _ := strconv.Atoi(r.Header.Get("X-Chunk-Index"))
+		total, _ := strconv.Atoi(r.Header.Get("X-Total-Chunks"))
+		ext := r.Header.Get("X-File-Ext")
+		if ext == "" {
+			ext = ".wav"
+		}
+		if total < 1 {
+			total = 1
+		}
+
+		var sess *chunkSession
+		if sessID == "" {
+			sessID = newToken()
+			sess = &chunkSession{ext: ext, total: total, files: make(map[int]string), at: time.Now()}
+			chunkSessions.Store(sessID, sess)
+		} else {
+			v, ok := chunkSessions.Load(sessID)
+			if !ok {
+				http.Error(w, "session not found", http.StatusNotFound)
+				return
+			}
+			sess = v.(*chunkSession)
+		}
+
+		tmp, err := os.CreateTemp("", "pl_chunk_*")
+		if err != nil {
+			http.Error(w, "temp: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := io.Copy(tmp, r.Body); err != nil {
+			tmp.Close()
+			os.Remove(tmp.Name())
+			http.Error(w, "read chunk: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		tmp.Close()
+
+		sess.mu.Lock()
+		sess.files[idx] = tmp.Name()
+		sess.at = time.Now()
+		received := len(sess.files)
+		sess.mu.Unlock()
+
+		if received < total {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"sessionId": sessID})
+			return
+		}
+
+		// All chunks received — assemble into one file.
+		chunkSessions.Delete(sessID)
+		tok := newToken()
+		outPath := filepath.Join(os.TempDir(), "pl_upload_"+tok+sess.ext)
+		out, err := os.Create(outPath)
+		if err != nil {
+			http.Error(w, "assemble create: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var chunkPaths []string
+		for i := 0; i < sess.total; i++ {
+			sess.mu.Lock()
+			p := sess.files[i]
+			sess.mu.Unlock()
+			chunkPaths = append(chunkPaths, p)
+			f, err := os.Open(p)
+			if err != nil {
+				out.Close()
+				os.Remove(outPath)
+				http.Error(w, "open chunk "+strconv.Itoa(i)+": "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			_, copyErr := io.Copy(out, f)
+			f.Close()
+			if copyErr != nil {
+				out.Close()
+				os.Remove(outPath)
+				http.Error(w, "assemble chunk "+strconv.Itoa(i)+": "+copyErr.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		out.Close()
+		for _, p := range chunkPaths {
+			os.Remove(p)
+		}
+
+		storeToken(tok, outPath, []string{outPath})
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"sessionId": sessID, "fileToken": tok})
 	}
 }
 
@@ -93,8 +232,11 @@ func handleReference(execDir string) http.HandlerFunc {
 	}
 }
 
-// handleAnalyze accepts a multipart audio file upload, runs AnalyzeAudioFull,
-// and returns the JSON result with spectrogramURL rewritten to /api/files/{token}.
+// handleAnalyze accepts either:
+//   - multipart form with "file" field (small files, original path), or
+//   - multipart form with "fileToken" field (chunked-upload path — file already on disk).
+//
+// Returns JSON result with spectrogramURL rewritten to /api/files/{token}.
 func handleAnalyze(an *Analyzer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -105,30 +247,48 @@ func handleAnalyze(an *Analyzer) http.HandlerFunc {
 			http.Error(w, "parse form: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		f, hdr, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, "missing file: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-		defer f.Close()
 
-		ext := filepath.Ext(hdr.Filename)
-		if ext == "" {
-			ext = ".wav"
-		}
-		tmp, err := os.CreateTemp("", "pl_analyze_in_*"+ext)
-		if err != nil {
-			http.Error(w, "temp file: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		tmpPath := tmp.Name()
-		defer os.Remove(tmpPath)
-		if _, err := io.Copy(tmp, f); err != nil {
+		var tmpPath string
+		var ownFile bool // true = we created the temp file and must delete it
+
+		if tok := r.FormValue("fileToken"); tok != "" {
+			p, ok := lookupToken(tok)
+			if !ok {
+				http.Error(w, "file token not found or expired", http.StatusNotFound)
+				return
+			}
+			unstoreToken(tok) // transfer ownership; we delete after analysis
+			tmpPath = p
+			ownFile = true
+		} else {
+			f, hdr, err := r.FormFile("file")
+			if err != nil {
+				http.Error(w, "missing file or fileToken: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			defer f.Close()
+			ext := filepath.Ext(hdr.Filename)
+			if ext == "" {
+				ext = ".wav"
+			}
+			tmp, err := os.CreateTemp("", "pl_analyze_in_*"+ext)
+			if err != nil {
+				http.Error(w, "temp file: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			tmpPath = tmp.Name()
+			ownFile = true
+			if _, err := io.Copy(tmp, f); err != nil {
+				tmp.Close()
+				os.Remove(tmpPath)
+				http.Error(w, "write temp: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 			tmp.Close()
-			http.Error(w, "write temp: "+err.Error(), http.StatusInternalServerError)
-			return
 		}
-		tmp.Close()
+		if ownFile {
+			defer os.Remove(tmpPath)
+		}
 
 		result, err := an.AnalyzeAudioFull(tmpPath)
 		if err != nil {
@@ -166,13 +326,6 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 			http.Error(w, "parse form: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		f, hdr, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, "missing file: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-		defer f.Close()
-
 		settingsJSON := r.FormValue("settings")
 		var settings JobSettings
 		if settingsJSON != "" {
@@ -182,27 +335,50 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 			}
 		}
 
-		ext := filepath.Ext(hdr.Filename)
-		if ext == "" {
-			ext = ".wav"
-		}
-		inTok := newToken()
-		inPath := filepath.Join(os.TempDir(), "pl_in_"+inTok+ext)
 		outTok := newToken()
 		outPath := filepath.Join(os.TempDir(), "pl_out_"+outTok+".wav")
 
-		inFile, err := os.Create(inPath)
-		if err != nil {
-			http.Error(w, "create temp: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if _, copyErr := io.Copy(inFile, f); copyErr != nil {
+		var inPath, inputName string
+
+		if tok := r.FormValue("fileToken"); tok != "" {
+			p, ok := lookupToken(tok)
+			if !ok {
+				http.Error(w, "file token not found or expired", http.StatusNotFound)
+				return
+			}
+			unstoreToken(tok) // transfer ownership to outTok cleanup below
+			inPath = p
+			inputName = r.FormValue("fileName")
+			if inputName == "" {
+				inputName = filepath.Base(p)
+			}
+		} else {
+			f, hdr, err := r.FormFile("file")
+			if err != nil {
+				http.Error(w, "missing file or fileToken: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			defer f.Close()
+			ext := filepath.Ext(hdr.Filename)
+			if ext == "" {
+				ext = ".wav"
+			}
+			inTok := newToken()
+			inPath = filepath.Join(os.TempDir(), "pl_in_"+inTok+ext)
+			inputName = hdr.Filename
+			inFile, err := os.Create(inPath)
+			if err != nil {
+				http.Error(w, "create temp: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if _, copyErr := io.Copy(inFile, f); copyErr != nil {
+				inFile.Close()
+				os.Remove(inPath)
+				http.Error(w, "write temp: "+copyErr.Error(), http.StatusInternalServerError)
+				return
+			}
 			inFile.Close()
-			os.Remove(inPath)
-			http.Error(w, "write temp: "+copyErr.Error(), http.StatusInternalServerError)
-			return
 		}
-		inFile.Close()
 
 		nextIDMu.Lock()
 		jobID := *nextID
@@ -258,7 +434,6 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 		defer watcher.unsubscribe(jobID)
 
 		// Send initial row so the frontend can render the queue entry immediately.
-		inputName := hdr.Filename
 		sendSSE(w, flusher, JobView{
 			ID: jobID, Input: inputName, Status: string(MasteringStatusWaiting),
 		})

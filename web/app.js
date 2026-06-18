@@ -734,14 +734,53 @@ async function serverGetReference() {
   return resp.json();
 }
 
+// Split file into chunks and upload to /api/upload-chunk.
+// Returns the fileToken once all chunks are assembled server-side.
+const CHUNK_SIZE = 24 * 1024 * 1024; // 24 MB — safely under Cloud Run's 32 MB request limit
+
+async function uploadFileChunked(file) {
+  const total = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+  let sessionId = "";
+  let fileToken = "";
+  const ext = file.name.includes(".") ? "." + file.name.split(".").pop() : ".wav";
+
+  for (let i = 0; i < total; i++) {
+    const start = i * CHUNK_SIZE;
+    const chunk = file.slice(start, start + CHUNK_SIZE);
+    const resp = await fetch("/api/upload-chunk", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-Session-ID": sessionId,
+        "X-Chunk-Index": String(i),
+        "X-Total-Chunks": String(total),
+        "X-File-Ext": ext,
+      },
+      body: chunk,
+    });
+    if (!resp.ok) throw new Error("upload chunk " + i + " failed: " + resp.status + " " + await resp.text());
+    const data = await resp.json();
+    sessionId = data.sessionId || sessionId;
+    if (data.fileToken) fileToken = data.fileToken;
+  }
+  if (!fileToken) throw new Error("upload did not return fileToken");
+  return fileToken;
+}
+
 async function serverAnalyzeFull(fileOrPath) {
-  const form = new FormData();
+  let form;
   if (fileOrPath instanceof File) {
-    form.append("file", fileOrPath);
-  } else if (typeof fileOrPath === "string" && (fileOrPath.startsWith("/api/") || fileOrPath.startsWith("blob:"))) {
+    const tok = await uploadFileChunked(fileOrPath);
+    form = new FormData();
+    form.append("fileToken", tok);
+  } else if (typeof fileOrPath === "string" && fileOrPath.startsWith("/api/")) {
+    // Output file already on server — fetch and re-upload only if not a download token
     const r = await fetch(fileOrPath);
     if (!r.ok) throw new Error("fetch file: " + r.status);
-    form.append("file", await r.blob(), "audio.wav");
+    const blob = await r.blob();
+    const tok = await uploadFileChunked(new File([blob], "audio.wav"));
+    form = new FormData();
+    form.append("fileToken", tok);
   } else {
     throw new Error("serverAnalyzeFull: unsupported input " + typeof fileOrPath);
   }
@@ -754,15 +793,19 @@ async function serverStartMastering(req) {
   // Jobs are processed sequentially in the background; rendering via window.plOnJobUpdate.
   (async () => {
     for (const file of req.inputs) {
-      await _streamOneMasterJob(file, req.settings).catch(console.error);
+      await _streamOneMasterJob(file, req.settings).catch((err) => {
+        alert("Master failed: " + err.message);
+      });
     }
   })();
   return [];
 }
 
 async function _streamOneMasterJob(file, settings) {
+  const fileToken = await uploadFileChunked(file);
   const form = new FormData();
-  form.append("file", file);
+  form.append("fileToken", fileToken);
+  form.append("fileName", file.name || "input.wav");
   form.append("settings", JSON.stringify(settings));
 
   const resp = await fetch("/api/master", { method: "POST", body: form });
