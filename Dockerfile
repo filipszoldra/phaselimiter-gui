@@ -4,12 +4,13 @@
 #   phaselimiter/bin/         — phase_limiter, audio_analyzer + their .so deps
 #   phaselimiter/resource/    — mastering_reference.json, sound_quality2_cache/, analysis_data/
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg \
       libsndfile1 \
+      libgomp1 \
       ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
