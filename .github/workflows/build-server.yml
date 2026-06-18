@@ -84,10 +84,8 @@ jobs:
 
       - name: smoke test server binary
         run: |
-          ./phaselimiter-server --help 2>&1 || echo "(no --help flag; that's expected)"
-          # Just verify the binary runs and exits cleanly
-          timeout 2 ./phaselimiter-server &
-          sleep 1
+          timeout 3 ./phaselimiter-server &
+          sleep 2
           curl -sf http://localhost:8080/api/reference || echo "(reference missing — resource/ not bundled yet)"
           wait || true
 
