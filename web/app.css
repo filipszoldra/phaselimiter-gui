@@ -226,6 +226,8 @@ details.eq-adv { margin-top: 10px; }
 .job-status.succeeded { background: rgba(107,191,115,.18); color: var(--ok); }
 .job-status.failed { background: rgba(224,90,90,.18); color: #e57373; }
 .job-out { font-size: 11px; color: var(--muted); margin: 4px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-download-link { color: var(--accent-soft); text-decoration: none; font-weight: 500; }
+.job-download-link:hover { color: var(--accent); text-decoration: underline; }
 .job-bar { height: 5px; background: #2b323d; border-radius: 99px; overflow: hidden; margin-top: 9px; }
 .job-bar > div { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); transition: width .25s; }
 
@@ -297,6 +299,66 @@ details.eq-adv { margin-top: 10px; }
   0%   { transform: translateX(-160%); }
   100% { transform: translateX(380%); }
 }
+
+/* ---------- A/B audio player ---------- */
+.abp {
+  padding: 8px 12px 7px;
+  background: var(--card-2);
+  border-radius: 7px;
+  margin: 8px 0 6px;
+}
+.abp-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.abp-sel {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.abp-sel-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 3px 9px;
+  font-size: 11px;
+  transition: background .12s, color .12s;
+}
+.abp-sel-btn.active { background: var(--accent); color: #fff; }
+.abp-sel-btn:not(.active):hover { background: var(--card); color: var(--text); }
+.abp-play {
+  appearance: none;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s;
+}
+.abp-play:hover { background: var(--accent-soft); }
+.abp-seek { flex: 1; min-width: 0; height: 4px; accent-color: var(--accent); cursor: pointer; }
+.abp-time { font-size: 11px; color: var(--muted); white-space: nowrap; min-width: 76px; text-align: right; }
+.abp-norm-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  cursor: pointer;
+}
+.abp-norm-chk { accent-color: var(--accent); cursor: pointer; }
+.abp-norm-label { font-size: 10px; color: var(--muted); }
 
 /* ---------- job result panel ---------- */
 .job-result { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }

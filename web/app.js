@@ -6,6 +6,7 @@
 // fall back to mocks so the layout and interactions stay testable.
 // ---------------------------------------------------------------------------
 const HAS_GO = typeof window.plStartMastering === "function";
+const IS_SERVER = !!(window.__webServerMode);
 
 // Analysis runs in a Go goroutine (the WebView2 UI thread invokes bound functions
 // synchronously, so a blocking analyze would freeze the window). The bound function
@@ -26,14 +27,27 @@ const wrapAnalyze = (fn) => (path) => new Promise((resolve, reject) => {
 });
 
 const bridge = {
-  pickInputFiles: HAS_GO ? window.plPickInputFiles : async () =>
-    ["C:\\Music\\demo track.wav", "C:\\Music\\second take.mp3"],
-  pickOutputDir: HAS_GO ? window.plPickOutputDir : async () => "C:\\Users\\you\\Downloads",
-  defaultOutputDir: HAS_GO ? window.plDefaultOutputDir : async () => "C:\\Users\\you\\Downloads",
-  startMastering: HAS_GO ? window.plStartMastering : mockStartMastering,
-  analyze: typeof window.plAnalyze === "function" ? wrapAnalyze(window.plAnalyze) : mockAnalyze,
-  analyzeFull: typeof window.plAnalyzeFull === "function" ? wrapAnalyze(window.plAnalyzeFull) : mockAnalyzeFull,
-  getReference: typeof window.plGetReference === "function" ? window.plGetReference : mockGetReference,
+  pickInputFiles: HAS_GO ? window.plPickInputFiles
+    : IS_SERVER ? serverPickFiles
+    : async () => ["C:\\Music\\demo track.wav", "C:\\Music\\second take.mp3"],
+  pickOutputDir: HAS_GO ? window.plPickOutputDir
+    : IS_SERVER ? async () => ""
+    : async () => "C:\\Users\\you\\Downloads",
+  defaultOutputDir: HAS_GO ? window.plDefaultOutputDir
+    : IS_SERVER ? async () => ""
+    : async () => "C:\\Users\\you\\Downloads",
+  startMastering: HAS_GO ? window.plStartMastering
+    : IS_SERVER ? serverStartMastering
+    : mockStartMastering,
+  analyze: typeof window.plAnalyze === "function" ? wrapAnalyze(window.plAnalyze)
+    : IS_SERVER ? serverAnalyzeFull
+    : mockAnalyze,
+  analyzeFull: typeof window.plAnalyzeFull === "function" ? wrapAnalyze(window.plAnalyzeFull)
+    : IS_SERVER ? serverAnalyzeFull
+    : mockAnalyzeFull,
+  getReference: typeof window.plGetReference === "function" ? window.plGetReference
+    : IS_SERVER ? serverGetReference
+    : mockGetReference,
 };
 
 const state = {
@@ -72,7 +86,7 @@ function routeEqLevels() {
 const el = (id) => document.getElementById(id);
 const num = (id) => parseFloat(el(id).value);
 const chk = (id) => el(id).checked;
-const baseName = (p) => p.replace(/^.*[\\/]/, "");
+const baseName = (p) => p instanceof File ? p.name : String(p).replace(/^.*[\\/]/, "");
 
 // ---------------------------------------------------------------------------
 // Settings <-> live readouts
@@ -166,7 +180,10 @@ function afterFilesChanged() {
 async function addFiles() {
   const files = await bridge.pickInputFiles();
   if (Array.isArray(files) && files.length) {
-    for (const f of files) if (f && !state.inputs.includes(f)) state.inputs.push(f);
+    for (const f of files) {
+      if (!f) continue;
+      if (IS_SERVER || !state.inputs.includes(f)) state.inputs.push(f);
+    }
     afterFilesChanged();
   }
 }
@@ -180,12 +197,15 @@ function jobRowHTML(j) {
     : j.status === "failed" ? "failed" : "";
   const pct = Math.round((j.progress || 0) * 100);
   const statusText = j.status === "processing" ? `${pct}%` : j.status;
+  const outDisplay = IS_SERVER && j.status === "succeeded" && j.output
+    ? `<a href="${j.output}" download="output.wav" class="job-download-link">⬇ Download</a>`
+    : `→ ${j.output}${j.message ? " · " + j.message : ""}`;
   return `
     <div class="job-top">
-      <span class="job-name" title="${j.input}">${baseName(j.input)}</span>
+      <span class="job-name" title="${baseName(j.input)}">${baseName(j.input)}</span>
       <span class="job-status ${statusClass}">${statusText}</span>
     </div>
-    <p class="job-out" title="${j.output}">→ ${j.output}${j.message ? " · " + j.message : ""}</p>
+    <p class="job-out">${outDisplay}</p>
     <div class="job-bar"><div style="width:${pct}%"></div></div>`;
 }
 
@@ -219,16 +239,27 @@ async function fetchJobResult(j, node) {
   loadBar.innerHTML = '<div class="bar-indeterminate" style="margin:4px 0 0"></div>';
   node.appendChild(loadBar);
   try {
-    const [inResult, outResult] = await Promise.all([
-      bridge.analyzeFull(j.input),
-      bridge.analyzeFull(j.output),
-    ]);
+    let inAnalyzePromise, outAnalyzePromise;
+    let meta = null;
+    if (IS_SERVER) {
+      meta = _serverJobMeta.get(j.id);
+      if (!meta || !meta.outputToken) { loadBar.remove(); return; }
+      inAnalyzePromise = meta.inputFile ? bridge.analyzeFull(meta.inputFile) : Promise.resolve(null);
+      outAnalyzePromise = fetch("/api/analyze-by-token/" + meta.outputToken).then(r => r.json());
+    } else {
+      inAnalyzePromise = bridge.analyzeFull(j.input);
+      outAnalyzePromise = bridge.analyzeFull(j.output);
+    }
+    const [inResult, outResult] = await Promise.all([inAnalyzePromise, outAnalyzePromise]);
     loadBar.remove();
     if (!outResult) return;
     const panel = document.createElement("div");
     panel.className = "job-result";
     panel.innerHTML = renderJobResultHTML(inResult, outResult);
     node.appendChild(panel);
+    if (IS_SERVER && meta?.inputFile) {
+      renderABPlayer(panel, meta.inputFile, j.output, inResult, outResult);
+    }
     renderJobCompareEQ(panel.querySelector(".jr-eq-canvas"), inResult, outResult);
     renderJobCompareLoudness(panel.querySelector(".jr-loud-canvas"), inResult, outResult);
     panel.querySelector(".job-result-head").addEventListener("click", () => {
@@ -241,6 +272,122 @@ async function fetchJobResult(j, node) {
     loadBar.remove();
     console.warn("analyze output failed:", e);
   }
+}
+
+function renderABPlayer(panel, inFile, outUrl, inResult, outResult) {
+  const inLufs  = inResult?.globalLoudness  ?? null;
+  const outLufs = outResult?.globalLoudness ?? null;
+  // Gain to bring output to the same LUFS as input (input plays unmodified).
+  const normOutGain = (inLufs != null && outLufs != null)
+    ? Math.min(2.0, Math.pow(10, (inLufs - outLufs) / 20))
+    : 1;
+  const canNorm = inLufs != null && outLufs != null;
+
+  const inSrc  = inFile instanceof File ? URL.createObjectURL(inFile) : String(inFile);
+  const outSrc = String(outUrl);
+
+  const normLabel = canNorm
+    ? `Match output loudness to input (${inLufs.toFixed(1)} LUFS)`
+    : "Normalize (no loudness data available)";
+
+  const div = document.createElement("div");
+  div.className = "abp";
+  div.innerHTML = `
+    <div class="abp-controls">
+      <div class="abp-sel">
+        <button class="abp-sel-btn active" data-which="in">Input</button>
+        <button class="abp-sel-btn"        data-which="out">Output</button>
+      </div>
+      <button class="abp-play">▶</button>
+      <input  class="abp-seek" type="range" min="0" max="100" step="0.1" value="0" />
+      <span   class="abp-time">0:00</span>
+    </div>
+    <label class="abp-norm-row">
+      <input class="abp-norm-chk" type="checkbox" ${canNorm ? "checked" : "disabled"} />
+      <span class="abp-norm-label">${normLabel}</span>
+    </label>`;
+
+  // Insert between .job-result-head and .job-result-body
+  panel.querySelector(".job-result-head").insertAdjacentElement("afterend", div);
+
+  const audio   = new Audio();
+  const playBtn = div.querySelector(".abp-play");
+  const seekEl  = div.querySelector(".abp-seek");
+  const timeEl  = div.querySelector(".abp-time");
+  const normChk = div.querySelector(".abp-norm-chk");
+
+  let actx = null, gainNode = null;
+  let currentWhich = "in";
+  let seeking = false;
+
+  const ensureCtx = () => {
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = actx.createGain();
+      actx.createMediaElementSource(audio).connect(gainNode);
+      gainNode.connect(actx.destination);
+    }
+    return actx;
+  };
+
+  const applyGain = () => {
+    if (!gainNode) return;
+    gainNode.gain.value = (currentWhich === "out" && normChk.checked) ? normOutGain : 1;
+  };
+
+  const setSource = (which, keepTime) => {
+    const wasTime    = keepTime ? audio.currentTime : 0;
+    const wasPlaying = !audio.paused;
+    audio.pause();
+    currentWhich = which;
+    audio.src = which === "in" ? inSrc : outSrc;
+    audio.load();
+    applyGain();
+    audio.addEventListener("loadedmetadata", () => {
+      audio.currentTime = Math.min(wasTime, audio.duration || 0);
+      if (wasPlaying) audio.play().catch(() => {});
+    }, { once: true });
+    div.querySelectorAll(".abp-sel-btn").forEach(b =>
+      b.classList.toggle("active", b.dataset.which === which));
+  };
+
+  playBtn.addEventListener("click", () => {
+    ensureCtx().resume();
+    if (audio.paused) {
+      if (!audio.src) setSource("in", false);
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  });
+
+  div.querySelectorAll(".abp-sel-btn").forEach(btn =>
+    btn.addEventListener("click", () => setSource(btn.dataset.which, true)));
+
+  normChk.addEventListener("change", applyGain);
+
+  audio.addEventListener("play",  () => { playBtn.textContent = "⏸"; });
+  audio.addEventListener("pause", () => { playBtn.textContent = "▶"; });
+  audio.addEventListener("ended", () => { playBtn.textContent = "▶"; seekEl.value = 0; });
+
+  const fmtT = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  audio.addEventListener("timeupdate", () => {
+    if (seeking) return;
+    const dur = audio.duration || 0;
+    if (dur > 0) seekEl.value = (audio.currentTime / dur) * 100;
+    timeEl.textContent = dur > 0 ? `${fmtT(audio.currentTime)} / ${fmtT(dur)}` : fmtT(audio.currentTime);
+  });
+
+  seekEl.addEventListener("mousedown",  () => { seeking = true; });
+  seekEl.addEventListener("touchstart", () => { seeking = true; }, { passive: true });
+  seekEl.addEventListener("input", () => {
+    const dur = audio.duration || 0;
+    if (dur > 0) audio.currentTime = (seekEl.value / 100) * dur;
+  });
+  seekEl.addEventListener("mouseup",  () => { seeking = false; });
+  seekEl.addEventListener("touchend", () => { seeking = false; });
+
+  setSource("in", false);
 }
 
 const SPECTRO_HELP = "A spectrogram shows how the track's frequency content evolves over time: " +
@@ -562,6 +709,101 @@ function mockGetReference() {
     ],
     loudness: -7.42,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Server mode bridge (window.__webServerMode = true)
+// ---------------------------------------------------------------------------
+const _serverJobMeta = new Map(); // jobId → { inputFile, outputToken }
+
+function serverPickFiles() {
+  return new Promise((resolve) => {
+    const input = document.getElementById("fileInput");
+    input.onchange = () => {
+      const files = Array.from(input.files || []);
+      input.value = "";
+      resolve(files.length ? files : []);
+    };
+    input.click();
+  });
+}
+
+async function serverGetReference() {
+  const resp = await fetch("/api/reference");
+  if (!resp.ok) throw new Error("getReference failed: " + resp.status);
+  return resp.json();
+}
+
+async function serverAnalyzeFull(fileOrPath) {
+  const form = new FormData();
+  if (fileOrPath instanceof File) {
+    form.append("file", fileOrPath);
+  } else if (typeof fileOrPath === "string" && (fileOrPath.startsWith("/api/") || fileOrPath.startsWith("blob:"))) {
+    const r = await fetch(fileOrPath);
+    if (!r.ok) throw new Error("fetch file: " + r.status);
+    form.append("file", await r.blob(), "audio.wav");
+  } else {
+    throw new Error("serverAnalyzeFull: unsupported input " + typeof fileOrPath);
+  }
+  const resp = await fetch("/api/analyze", { method: "POST", body: form });
+  if (!resp.ok) throw new Error("analyze failed: " + resp.status + " " + await resp.text());
+  return resp.json();
+}
+
+async function serverStartMastering(req) {
+  // Jobs are processed sequentially in the background; rendering via window.plOnJobUpdate.
+  (async () => {
+    for (const file of req.inputs) {
+      await _streamOneMasterJob(file, req.settings).catch(console.error);
+    }
+  })();
+  return [];
+}
+
+async function _streamOneMasterJob(file, settings) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("settings", JSON.stringify(settings));
+
+  const resp = await fetch("/api/master", { method: "POST", body: form });
+  if (!resp.ok) throw new Error("master request failed: " + resp.status + " " + await resp.text());
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let lastId = null;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // SSE events are separated by double newlines; split on them.
+      const events = buffer.split("\n\n");
+      buffer = events.pop();
+      for (const evt of events) {
+        for (const line of evt.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const jv = JSON.parse(line.slice(6));
+            lastId = jv.id;
+            window.plOnJobUpdate(jv);
+            if (jv.status === "succeeded") {
+              const tok = jv.output ? jv.output.replace("/api/download/", "") : null;
+              _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok });
+              return;
+            }
+            if (jv.status === "failed") return;
+          } catch (_) {}
+        }
+      }
+    }
+  } catch (err) {
+    if (lastId !== null) {
+      window.plOnJobUpdate({ id: lastId, status: "failed", progress: 0, message: String(err) });
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1554,7 +1796,12 @@ async function init() {
     updateAnalysisBandChart();
   });
 
-  el("outputDir").value = (await bridge.defaultOutputDir()) || "";
+  if (IS_SERVER) {
+    const outRow = el("outputDir").closest(".field-row");
+    if (outRow) outRow.style.display = "none";
+  } else {
+    el("outputDir").value = (await bridge.defaultOutputDir()) || "";
+  }
   initReferenceProfile();
   afterFilesChanged();
   buildSectionsChart();

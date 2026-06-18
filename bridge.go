@@ -1,3 +1,5 @@
+//go:build windows
+
 package main
 
 import (
@@ -6,9 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -21,54 +21,6 @@ type App struct {
 	execDir  string
 	emit     func(js string) // push JS to the page (set by the platform main)
 	nextID   int
-}
-
-// JobView is the row the frontend renders for one mastering job; it is also the
-// shape pushed on every progress update.
-type JobView struct {
-	ID       int     `json:"id"`
-	Input    string  `json:"input"`
-	Output   string  `json:"output"`
-	Status   string  `json:"status"`
-	Progress float64 `json:"progress"`
-	Message  string  `json:"message"`
-}
-
-func toJobView(m Mastering) JobView {
-	return JobView{
-		ID:       m.Id,
-		Input:    m.Input,
-		Output:   m.Output,
-		Status:   string(m.Status),
-		Progress: m.Progression,
-		Message:  m.Message,
-	}
-}
-
-// JobSettings mirrors the engine-facing controls the UI exposes (the 4-band
-// Reference-Tone EQ is intentionally gone — it switched the engine to distance
-// mode). Field names match the JS settings object.
-type JobSettings struct {
-	OutputName              string     `json:"outputName"`
-	Loudness                float64    `json:"loudness"`
-	Level                   float64    `json:"level"`
-	BassPreservation        bool       `json:"bassPreservation"`
-	LimiterOnly             bool       `json:"limiterOnly"`
-	Ceiling                 float64    `json:"ceiling"`
-	LimiterOversample       int        `json:"limiterOversample"`
-	LimiterMaxIter          int        `json:"limiterMaxIter"`
-	PreCompression          bool       `json:"preCompression"`
-	PreCompressionThreshold float64    `json:"preCompressionThreshold"`
-	PreCompressionMeanSec   float64    `json:"preCompressionMeanSec"`
-	MSMatchingLevel         float64    `json:"msMatchingLevel"`
-	EQBandLevels            [9]float64 `json:"eqBandLevels"`
-	EQTransformLevels       [9]float64 `json:"eqTransformLevels"`
-	EQTransformSymmetric    bool       `json:"eqTransformSymmetric"`
-	EQAnalysisTarget        [9]float64 `json:"eqAnalysisTarget"`  // per-band dBFS targets from analysis drawer
-	EQAnalysisEnabled       bool       `json:"eqAnalysisEnabled"` // send --eq_analysis_target to engine
-	Sections                []Section  `json:"sections"`
-	SectionIntensity        float64    `json:"sectionIntensity"`
-	SectionMasteringEnable  bool       `json:"sectionMasteringEnable"`
 }
 
 // StartReq is the payload for plStartMastering.
@@ -180,21 +132,6 @@ func (app *App) startMastering(req StartReq) ([]JobView, error) {
 // Reference profile (mastering_reference.json → frontend)
 // ---------------------------------------------------------------------------
 
-// RefBand is one ERB band from the mastering reference profile.
-type RefBand struct {
-	LowFreq  float64 `json:"lowFreq"`
-	HighFreq float64 `json:"highFreq"`
-	Loudness float64 `json:"loudness"`
-	MidMean  float64 `json:"midMean"`
-	SideMean float64 `json:"sideMean"`
-}
-
-// RefProfile is the per-band spectral target returned to the frontend.
-type RefProfile struct {
-	Bands    []RefBand `json:"bands"`
-	Loudness float64   `json:"loudness"`
-}
-
 // getReference reads phaselimiter/resource/mastering_reference.json and returns
 // the 9-band loudness profile used by AutoMastering5.
 func (app *App) getReference() (*RefProfile, error) {
@@ -240,36 +177,6 @@ func (app *App) serveLocalFile(wr http.ResponseWriter, r *http.Request) {
 	http.ServeFile(wr, r, p)
 }
 
-// ---------------------------------------------------------------------------
-// platform-neutral path helpers
-// ---------------------------------------------------------------------------
-
-func getExecDir() string {
-	ex, err := os.Executable()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return filepath.Dir(ex)
-}
-
-// findFfmpeg returns an absolute path to ffmpeg. It checks beside the exe first
-// (the expected install layout), then falls back to the system PATH. Using an
-// absolute path avoids Go 1.19+'s refusal to run executables found in "."
-// (exec: "ffmpeg": cannot run executable found relative to current directory).
-func findFfmpeg() string {
-	beside := filepath.Join(getExecDir(), "ffmpeg")
-	if runtime.GOOS == "windows" {
-		beside += ".exe"
-	}
-	if _, err := os.Stat(beside); err == nil {
-		return beside
-	}
-	if p, err := exec.LookPath("ffmpeg"); err == nil {
-		return p
-	}
-	return "ffmpeg"
-}
-
 func getDefaultOutputDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -284,7 +191,3 @@ func getDefaultOutputDir() string {
 	return home
 }
 
-func dirExists(p string) bool {
-	info, err := os.Stat(p)
-	return err == nil && info.IsDir()
-}
