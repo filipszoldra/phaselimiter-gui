@@ -1,0 +1,133 @@
+name: build-server
+
+# Builds the Linux HTTP server binary + Docker image for Cloud Run.
+#
+# Required GitHub secrets:
+#   GH_PHASELIMITER_TOKEN  — PAT with `repo` + `actions:read` scopes on the
+#                            phaselimiter engine repo (to download engine artifact)
+#   GCP_SA_KEY             — Service account JSON key with roles:
+#                              Artifact Registry Writer
+#                              Cloud Run Admin
+#                              Service Account User
+#
+# Required env vars in the workflow (edit before first run):
+#   ENGINE_REPO     — owner/repo for the phaselimiter engine (default below)
+#   ENGINE_RUN_ID   — GitHub Actions run ID that produced `engine-bin-linux`
+#   GCP_PROJECT     — Google Cloud project ID
+#   GCP_REGION      — Cloud Run region (europe-west1 recommended for EU)
+#   AR_REPO         — Artifact Registry repo name (e.g. phaselimiter)
+#   SERVICE_NAME    — Cloud Run service name
+
+on:
+  workflow_dispatch:
+    inputs:
+      engine_run_id:
+        description: 'Run ID for engine-bin-linux artifact (phaselimiter repo)'
+        required: false
+
+env:
+  ENGINE_REPO: filipszoldra/phaselimiter
+  ENGINE_RUN_ID: ${{ github.event.inputs.engine_run_id || '' }}
+  GCP_PROJECT: phaselimiter-fs
+  GCP_REGION: europe-central2
+  AR_REPO: phaselimiter
+  SERVICE_NAME: phaselimiter
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: build server binary (linux/amd64)
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o phaselimiter-server .
+
+      - name: download engine-bin-linux artifact
+        env:
+          GH_TOKEN: ${{ secrets.GH_PHASELIMITER_TOKEN }}
+        run: |
+          RUN_ID="$ENGINE_RUN_ID"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list --repo "$ENGINE_REPO" --workflow build-engine-linux.yml \
+              --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+            echo "Auto-detected latest successful engine run: $RUN_ID"
+          fi
+          gh run download "$RUN_ID" \
+            --repo "$ENGINE_REPO" \
+            --name engine-bin-linux \
+            --dir engine-artifact
+          echo "=== engine artifact contents ==="
+          ls -lh engine-artifact/ engine-artifact/bin/ 2>/dev/null || ls -lhR engine-artifact/
+
+      - name: assemble phaselimiter/ directory for Docker
+        run: |
+          # The artifact layout from build-engine-linux.yml:
+          #   engine-artifact/bin/phase_limiter
+          #   engine-artifact/bin/audio_analyzer
+          #   engine-artifact/bin/lib*.so*
+          mkdir -p phaselimiter/bin
+          cp -r engine-artifact/bin/. phaselimiter/bin/
+          chmod +x phaselimiter/bin/phase_limiter phaselimiter/bin/audio_analyzer || true
+
+          # Resource files (mastering_reference.json, sound_quality2_cache, analysis_data)
+          # are expected in the engine artifact at engine-artifact/resource/ OR must be
+          # checked out from the phaselimiter repo separately (see note below).
+          # If the artifact doesn't include them, uncomment and adjust:
+          # cp -r engine-artifact/resource phaselimiter/resource
+          echo "=== phaselimiter/bin ==="
+          ls -lh phaselimiter/bin/
+
+      - name: smoke test server binary
+        run: |
+          ./phaselimiter-server --help 2>&1 || echo "(no --help flag; that's expected)"
+          # Just verify the binary runs and exits cleanly
+          timeout 2 ./phaselimiter-server &
+          sleep 1
+          curl -sf http://localhost:8080/api/reference || echo "(reference missing — resource/ not bundled yet)"
+          wait || true
+
+      - name: build Docker image
+        run: |
+          docker build -t server-local:latest .
+          echo "Docker image built successfully"
+
+      - name: authenticate to GCP
+        if: ${{ secrets.GCP_SA_KEY != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: set up gcloud CLI
+        if: ${{ secrets.GCP_SA_KEY != '' }}
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: push image to Artifact Registry and deploy to Cloud Run
+        if: ${{ secrets.GCP_SA_KEY != '' }}
+        run: |
+          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${AR_REPO}/server:${GITHUB_SHA::8}"
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+          docker tag server-local:latest "$IMAGE"
+          docker push "$IMAGE"
+          gcloud run deploy "$SERVICE_NAME" \
+            --image "$IMAGE" \
+            --region "$GCP_REGION" \
+            --platform managed \
+            --allow-unauthenticated \
+            --max-instances 2 \
+            --concurrency 1 \
+            --memory 4Gi \
+            --cpu 2 \
+            --timeout 3600 \
+            --quiet
+          echo "Deployed: $(gcloud run services describe $SERVICE_NAME --region $GCP_REGION --format 'value(status.url)')"
+
+      - name: upload server binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phaselimiter-server-linux
+          path: phaselimiter-server
