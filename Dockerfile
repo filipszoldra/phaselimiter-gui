@@ -34,6 +34,21 @@ COPY phaselimiter/ ./phaselimiter/
 RUN find /app/phaselimiter/bin -name "libipp*.so.12" | \
     while read f; do ln -sf "$(basename "$f")" "${f}.0"; done
 
+# Regenerate sound_quality2_cache as a Linux-native boost::binary_archive.
+# The cache copied from the engine artifact was built on Windows and uses a
+# platform-specific binary archive format that cannot be read on Linux, causing
+# phase_limiter to throw "syntax error at line 1" during AutoMastering init.
+# Running audio_analyzer --mode sound_quality2_preparation here (inside the
+# final Linux amd64 container) produces a compatible file in-place.
+# The build continues on failure so limiter-only mode still works without it.
+RUN LD_LIBRARY_PATH=/app/phaselimiter/bin \
+    /app/phaselimiter/bin/audio_analyzer \
+      --mode sound_quality2_preparation \
+      --sound_quality2_cache /app/phaselimiter/resource/sound_quality2_cache \
+      --analysis_data_dir /app/phaselimiter/resource/analysis_data \
+    && echo "sound_quality2_cache regenerated: $(stat -c%s /app/phaselimiter/resource/sound_quality2_cache) bytes" \
+    || echo "WARNING: sound_quality2_preparation failed — mastering5 will crash on this image"
+
 # Put bundled .so files on the library search path so the engine finds them at runtime.
 ENV LD_LIBRARY_PATH=/app/phaselimiter/bin
 
