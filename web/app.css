@@ -393,6 +393,9 @@ details.eq-adv { margin-top: 10px; }
 .jr-chart-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 2px; }
 .jr-spectro-wrap { margin-top: 8px; }
 .jr-spectro-label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 2px; }
+.jr-spectro-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; }
+.jr-spectro-pair .spectro-body .spectro { height: 120px; }
+@media (max-width: 520px) { .jr-spectro-pair { grid-template-columns: 1fr; } }
 .jr-curve-out  { fill: none; stroke: #4ecdc4; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .jr-dot-out    { fill: #4ecdc4; pointer-events: none; }
 .jr-loud-in    { fill: none; stroke: #e05555; stroke-width: 1; opacity: 0.6; stroke-linejoin: round; }

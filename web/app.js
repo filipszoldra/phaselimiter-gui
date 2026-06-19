@@ -302,7 +302,7 @@ function renderABPlayer(panel, inFile, outUrl, inResult, outResult) {
     : 1;
   const canNorm = inLufs != null && outLufs != null;
 
-  const inSrc  = inFile instanceof File ? URL.createObjectURL(inFile) : String(inFile);
+  let inSrc  = inFile instanceof File ? URL.createObjectURL(inFile) : String(inFile);
   const outSrc = String(outUrl);
 
   const normLabel = canNorm
@@ -387,7 +387,10 @@ function renderABPlayer(panel, inFile, outUrl, inResult, outResult) {
 
   audio.addEventListener("play",  () => { playBtn.textContent = "⏸"; });
   audio.addEventListener("pause", () => { playBtn.textContent = "▶"; });
-  audio.addEventListener("ended", () => { playBtn.textContent = "▶"; seekEl.value = 0; });
+  audio.addEventListener("ended", () => {
+    playBtn.textContent = "▶"; seekEl.value = 0;
+    if (currentWhich === "out" && inSrc.startsWith("blob:")) { URL.revokeObjectURL(inSrc); inSrc = ""; }
+  });
 
   const fmtT = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   audio.addEventListener("timeupdate", () => {
@@ -424,7 +427,7 @@ function spectroFigureHTML(src, caption, durationSec) {
       <div class="spectro-head">${head}</div>
       <div class="spectro-body">
         <div class="spectro-yaxis"><span>20k</span><span>5k</span><span>1k</span><span>0&#8201;Hz</span></div>
-        <img class="spectro" src="${src}" data-duration="${durationSec || 0}" alt="Spectrogram${caption ? " " + caption : ""}" />
+        <img class="spectro" src="${src}" data-duration="${durationSec || 0}" alt="Spectrogram${caption ? " " + caption : ""}" onerror="const f=this.closest('.spectro-fig');if(f)f.hidden=true" />
       </div>
       <div class="spectro-xaxis"><span>0:00</span><span>Time</span><span>${dur}</span></div>
     </figure>`;
@@ -442,6 +445,7 @@ function renderJobResultHTML(inR, outR) {
     ["LUFS",      fmt1(inR?.globalLoudness, ""),   fmt1(outR?.globalLoudness, ""),   delta(inR?.globalLoudness, outR?.globalLoudness, "")],
     ["True-peak", fmt1(inR?.truePeak, " dBTP"),    fmt1(outR?.truePeak, " dBTP"),    ""],
     ["LRA",       fmt1(inR?.loudnessRange, " LU"), fmt1(outR?.loudnessRange, " LU"), delta(inR?.loudnessRange, outR?.loudnessRange, " LU")],
+    ["Dynamics",  fmt1(inR?.dynamics, " dB"),      fmt1(outR?.dynamics, " dB"),      delta(inR?.dynamics, outR?.dynamics, " dB")],
   ];
   const metricsHTML = `<table class="jr-metrics">
     <tr><th></th><th class="jr-col-in">Input</th><th class="jr-col-out">Output</th><th></th></tr>
@@ -450,7 +454,7 @@ function renderJobResultHTML(inR, outR) {
   const spectrosHTML = [
     spectroFigureHTML(inR?.spectrogramURL,  "Input",  inR?.totalSec),
     spectroFigureHTML(outR?.spectrogramURL, "Output", outR?.totalSec),
-  ].join("");
+  ].filter(Boolean).join("");
   return `
     <div class="job-result-head">
       <span class="job-result-toggle">+</span>
@@ -460,7 +464,7 @@ function renderJobResultHTML(inR, outR) {
       ${metricsHTML}
       <div class="jr-chart-section"><span class="jr-chart-label">Per-band level</span><div class="jr-eq-canvas"></div></div>
       <div class="jr-chart-section"><span class="jr-chart-label">Loudness over time</span><div class="jr-loud-canvas"></div></div>
-      ${spectrosHTML ? `<div class="jr-chart-section"><span class="jr-chart-label">Spectrogram <button class="help" type="button" data-help="${SPECTRO_HELP}">?</button></span>${spectrosHTML}</div>` : ""}
+      ${spectrosHTML ? `<div class="jr-chart-section"><span class="jr-chart-label">Spectrogram <button class="help" type="button" data-help="${SPECTRO_HELP}">?</button></span><div class="jr-spectro-pair">${spectrosHTML}</div></div>` : ""}
     </div>`;
 }
 
@@ -472,7 +476,7 @@ function renderJobCompareEQ(container, inR, outR) {
   const allBands = [...(inBands || []), ...(outBands || [])];
   const allDb = allBands.map(b => b.loudness).filter(v => v != null);
   const yMin = Math.floor((Math.min(...allDb) - 3) / 5) * 5;
-  const yMax = -4;
+  const yMax = allDb.length ? Math.min(-4, Math.ceil((Math.max(...allDb) + 3) / 5) * 5) : -4;
   const W = 320, H = 110, PL = 32, PR = 6, PT = 8, PB = 22;
   const CW = W - PL - PR, CH = H - PT - PB;
   const xOf = i => PL + (i / 8) * CW;
@@ -569,6 +573,17 @@ function renderJobCompareLoudness(container, inR, outR) {
   };
   drawSeries(inS,  "jr-loud-in");
   drawSeries(outS, "jr-loud-out");
+  // Legend in top-right corner
+  [{ label: "Output", cls: "jr-loud-out", xEnd: W - PR }, { label: "Input", cls: "jr-loud-in", xEnd: W - PR - 46 }].forEach(({ label, cls, xEnd }) => {
+    const ln = document.createElementNS(ns, "line");
+    ln.setAttribute("x1", xEnd - 12); ln.setAttribute("x2", xEnd);
+    ln.setAttribute("y1", PT + 4); ln.setAttribute("y2", PT + 4);
+    ln.setAttribute("class", cls); svg.appendChild(ln);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", xEnd - 14); t.setAttribute("y", PT + 7);
+    t.setAttribute("class", "ab-scale"); t.setAttribute("text-anchor", "end");
+    t.textContent = label; svg.appendChild(t);
+  });
   [0, Math.round(allSec / 2), allSec].forEach(sec => {
     const x = xOf(sec);
     const t = document.createElementNS(ns, "text");
