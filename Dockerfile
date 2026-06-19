@@ -28,12 +28,14 @@ WORKDIR /app
 COPY phaselimiter-server .
 COPY phaselimiter/ ./phaselimiter/
 
+# IPP runtime dispatcher dlopen's the CPU-specific variant by full soname (e.g.
+# libippvmk0.so.12.0), but the artifact ships only *.so.12. Create the missing
+# *.so.12.0 symlinks so dlopen finds them via LD_LIBRARY_PATH.
+RUN find /app/phaselimiter/bin -name "libipp*.so.12" | \
+    while read f; do ln -sf "$(basename "$f")" "${f}.0"; done
+
 # Put bundled .so files on the library search path so the engine finds them at runtime.
 ENV LD_LIBRARY_PATH=/app/phaselimiter/bin
-
-# Verify all shared-library deps are satisfied at build time (shows "not found" in CI logs).
-RUN LD_LIBRARY_PATH=/app/phaselimiter/bin ldd /app/phaselimiter/bin/phase_limiter 2>&1 || true && \
-    LD_LIBRARY_PATH=/app/phaselimiter/bin ldd /app/phaselimiter/bin/audio_analyzer 2>&1 || true
 
 EXPOSE 8080
 CMD ["/app/phaselimiter-server"]
