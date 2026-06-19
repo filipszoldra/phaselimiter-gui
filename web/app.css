@@ -255,8 +255,9 @@ details.eq-adv { margin-top: 10px; }
 .ab-metrics strong { color: var(--text); }
 
 /* ---------- analysis drawer ---------- */
+.analysis-backdrop { position: fixed; inset: 0; z-index: 9; background: transparent; }
 .analysis-drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 380px; background: var(--bg-2);
-  border-left: 1px solid var(--line); padding: 18px; box-shadow: -10px 0 30px rgba(0,0,0,.4); overflow-y: auto; }
+  border-left: 1px solid var(--line); padding: 18px; box-shadow: -10px 0 30px rgba(0,0,0,.4); overflow-y: auto; z-index: 10; }
 .drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .drawer-head h2 { margin: 0; font-size: 15px; }
 

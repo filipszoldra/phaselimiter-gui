@@ -88,6 +88,8 @@ const num = (id) => parseFloat(el(id).value);
 const chk = (id) => el(id).checked;
 const baseName = (p) => p instanceof File ? p.name : String(p).replace(/^.*[\\/]/, "");
 
+const _jobStartTime = new Map(); // jobId -> performance.now() when progress first > 0
+
 // ---------------------------------------------------------------------------
 // Settings <-> live readouts
 // ---------------------------------------------------------------------------
@@ -196,7 +198,18 @@ function jobRowHTML(j) {
     : j.status === "succeeded" ? "succeeded"
     : j.status === "failed" ? "failed" : "";
   const pct = Math.round((j.progress || 0) * 100);
-  const statusText = j.status === "processing" ? `${pct}%` : j.status;
+  let statusText = j.status;
+  if (j.status === "processing") {
+    const p = j.progress || 0;
+    const start = _jobStartTime.get(j.id);
+    if (p > 0.02 && start != null) {
+      const elapsed = (performance.now() - start) / 1000;
+      const remaining = Math.ceil(elapsed * (1 - p) / p);
+      statusText = `${pct}% · ~${remaining}s`;
+    } else {
+      statusText = `${pct}%`;
+    }
+  }
   const outDisplay = IS_SERVER && j.status === "succeeded" && j.output
     ? `<a href="${j.output}" download="output.wav" class="job-download-link">⬇ Download</a>`
     : `→ ${j.output || ""}${j.message ? " · " + j.message : ""}`;
@@ -212,6 +225,10 @@ function jobRowHTML(j) {
 
 function renderJob(j) {
   state.jobs.set(j.id, j);
+  if (j.status === "processing" && j.progress > 0 && !_jobStartTime.has(j.id)) {
+    _jobStartTime.set(j.id, performance.now());
+  }
+  if (j.status !== "processing") _jobStartTime.delete(j.id);
   let node = document.querySelector(`.job[data-id="${j.id}"]`);
   const list = el("jobList");
   const empty = list.querySelector(".empty");
@@ -1686,7 +1703,7 @@ async function startAnalyze(forcePath) {
       buildSectionsChart();
       buildSectionsList();
       renderAnalysisDrawer(result);
-      el("analysisDrawer").classList.remove("hidden");
+      openAnalysisDrawer();
     }
   } catch (err) {
     alert("Analyze failed: " + err);
@@ -1806,6 +1823,27 @@ function setupSectionDraw() {
 }
 
 // ---------------------------------------------------------------------------
+// Analysis drawer open/close (overlay mode — click outside to close)
+// ---------------------------------------------------------------------------
+function openAnalysisDrawer() {
+  el("analysisDrawer").classList.remove("hidden");
+  let bd = document.getElementById("analysisBackdrop");
+  if (!bd) {
+    bd = document.createElement("div");
+    bd.id = "analysisBackdrop";
+    bd.className = "analysis-backdrop";
+    bd.addEventListener("click", closeAnalysisDrawer);
+    document.body.appendChild(bd);
+  }
+  bd.classList.remove("hidden");
+}
+function closeAnalysisDrawer() {
+  el("analysisDrawer").classList.add("hidden");
+  const bd = document.getElementById("analysisBackdrop");
+  if (bd) bd.classList.add("hidden");
+}
+
+// ---------------------------------------------------------------------------
 // Wire up
 // ---------------------------------------------------------------------------
 async function initReferenceProfile() {
@@ -1844,8 +1882,12 @@ async function init() {
     if (_eqPathEl) updateEQ();
     if (_abBlueLine) updateAnalysisBandChart();
   });
-  el("analysisToggle").addEventListener("click", () => el("analysisDrawer").classList.toggle("hidden"));
-  el("analysisClose").addEventListener("click", () => el("analysisDrawer").classList.add("hidden"));
+  el("analysisToggle").addEventListener("click", () => {
+    if (el("analysisDrawer").classList.contains("hidden")) openAnalysisDrawer();
+    else closeAnalysisDrawer();
+  });
+  el("analysisClose").addEventListener("click", closeAnalysisDrawer);
+
   el("analysisEqEnable").addEventListener("change", (e) => {
     state.eqAnalysisEnabled = e.target.checked;
     if (e.target.checked && !state.analysisTarget) {

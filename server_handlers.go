@@ -413,10 +413,10 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 		// Register download token before job completes so it's ready when SSE fires.
 		storeToken(outTok, outPath, []string{inPath, outPath})
 
-		// Bug 5/12: cancel the engine process if the client disconnects.
-		// context.WithCancel wraps r.Context() — cancelled on disconnect OR handler return.
-		jobCtx, cancelJob := context.WithCancel(r.Context())
-		defer cancelJob()
+		// Use a background context so the engine keeps running if the SSE client
+		// disconnects mid-job. r.Context() cancellation (client disconnect) would
+		// SIGKILL the engine after only a few seconds, causing "signal: killed".
+		jobCtx := context.Background()
 
 		oversample := settings.LimiterOversample
 		if oversample < 1 {
