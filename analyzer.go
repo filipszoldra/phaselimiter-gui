@@ -204,6 +204,7 @@ func (an *Analyzer) runAnalyzerOnWav(wavPath string, extraArgs []string) (AudioA
 	args := append([]string{
 		"--mode", "default",
 		"--input", wavPath,
+		"--sound_quality2=false",
 		"--sound_quality2_cache", an.SoundQuality2Cache,
 		"--analysis_data_dir", an.AnalysisDataDir,
 		"--quick_exit", "false",

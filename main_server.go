@@ -127,19 +127,11 @@ func handleDebug(execDir string) http.HandlerFunc {
 			fmt.Fprintln(&sb)
 		}
 
-		cacheDir := filepath.Join(execDir, "phaselimiter/resource/sound_quality2_cache")
-		if cEntries, cErr := os.ReadDir(cacheDir); cErr != nil {
+		cachePath := filepath.Join(execDir, "phaselimiter/resource/sound_quality2_cache")
+		if info, cErr := os.Stat(cachePath); cErr != nil {
 			fmt.Fprintf(&sb, "sound_quality2_cache: %v\n\n", cErr)
 		} else {
-			fmt.Fprintf(&sb, "sound_quality2_cache: %d files\n", len(cEntries))
-			for i, e := range cEntries {
-				if i >= 5 {
-					fmt.Fprintf(&sb, "  ... (%d more)\n", len(cEntries)-5)
-					break
-				}
-				fmt.Fprintf(&sb, "  %s\n", e.Name())
-			}
-			fmt.Fprintln(&sb)
+			fmt.Fprintf(&sb, "sound_quality2_cache: present (size=%d isDir=%v)\n\n", info.Size(), info.IsDir())
 		}
 
 		analysisDir := filepath.Join(execDir, "phaselimiter/resource/analysis_data")
@@ -172,7 +164,8 @@ func handleDebug(execDir string) http.HandlerFunc {
 			aaCmd := exec.Command(aaPath,
 				"--mode", "default",
 				"--input", silenceWav,
-				"--sound_quality2_cache", cacheDir,
+				"--sound_quality2=false",
+				"--sound_quality2_cache", cachePath,
 				"--analysis_data_dir", analysisDir,
 				"--quick_exit", "false",
 			)

@@ -89,6 +89,8 @@ jobs:
           cd phaselimiter-src && git sparse-checkout set resource && cd ..
           cp -r phaselimiter-src/resource phaselimiter/resource
           rm -rf phaselimiter-src
+          # sound_quality2_cache is gitignored in the engine repo — ship it from this repo.
+          cp resource_extra/sound_quality2_cache phaselimiter/resource/sound_quality2_cache
           echo "=== phaselimiter/resource ==="
           ls -lh phaselimiter/resource/
 
