@@ -88,8 +88,9 @@ const num = (id) => parseFloat(el(id).value);
 const chk = (id) => el(id).checked;
 const baseName = (p) => p instanceof File ? p.name : String(p).replace(/^.*[\\/]/, "");
 
-const _jobStartTime = new Map(); // jobId -> performance.now() when progress first > 0
-const _jobBlobUrls  = new Map(); // jobId -> blob: URL of mastered output (cached immediately on success)
+const _jobStartTime    = new Map(); // jobId -> performance.now() when progress first > 0
+const _jobBlobUrls     = new Map(); // jobId -> blob: URL of mastered output (cached immediately on success)
+const _incomingChunks  = new Map(); // jobId -> base64 chunk array (assembled on file-done SSE event)
 
 // ---------------------------------------------------------------------------
 // Settings <-> live readouts
@@ -890,12 +891,43 @@ async function _streamOneMasterJob(file, settings) {
           if (!line.startsWith("data: ")) continue;
           try {
             const jv = JSON.parse(line.slice(6));
+
+            // File-chunk: accumulate base64 data from inline SSE transfer.
+            if (jv.type === "file-chunk") {
+              let chunks = _incomingChunks.get(jv.id);
+              if (!chunks) { chunks = []; _incomingChunks.set(jv.id, chunks); }
+              chunks[jv.index] = jv.data;
+              continue;
+            }
+
+            // File-done: assemble all chunks into a blob URL.
+            if (jv.type === "file-done") {
+              const chunks = _incomingChunks.get(jv.id);
+              _incomingChunks.delete(jv.id);
+              if (chunks && chunks.length > 0) {
+                try {
+                  const combined = chunks.join("");
+                  const raw = atob(combined);
+                  const bytes = new Uint8Array(raw.length);
+                  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+                  const blob = new Blob([bytes], { type: "audio/wav" });
+                  const url = URL.createObjectURL(blob);
+                  _jobBlobUrls.set(jv.id, url);
+                  const link = document.querySelector(`.job[data-id="${jv.id}"] .job-download-link`);
+                  if (link) link.href = url;
+                } catch (assembleErr) {
+                  console.warn("file-done assembly failed:", assembleErr);
+                }
+              }
+              return; // SSE stream is finished after file-done
+            }
+
             lastId = jv.id;
             window.plOnJobUpdate(jv);
             if (jv.status === "succeeded") {
               const tok = jv.output ? jv.output.replace("/api/download/", "") : null;
               _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok });
-              return;
+              // Do NOT return here — wait for file-done (file data streams next).
             }
             if (jv.status === "failed") return;
           } catch (_) {}

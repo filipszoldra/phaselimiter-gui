@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -485,6 +486,10 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 						// Job failed — clean up input; output may not exist.
 						deleteTokenEntry(outTok)
 						os.Remove(inPath)
+					} else {
+						// Stream the output WAV inline so the browser gets a blob URL on the
+						// same connection — immune to Cloud Run revision replacement after deploy.
+						streamFileSSE(w, flusher, jobID, outPath)
 					}
 					return
 				}
@@ -499,6 +504,49 @@ func sendSSE(w http.ResponseWriter, flusher http.Flusher, jv JobView) {
 	b, _ := json.Marshal(jv)
 	fmt.Fprintf(w, "data: %s\n\n", b)
 	flusher.Flush()
+}
+
+// streamFileSSE sends the output WAV inline as base64 SSE events so the browser
+// can build a blob URL without a separate HTTP request. This is the only approach
+// that survives Cloud Run revision replacements (the file transfer uses the same
+// connection as mastering, which is pinned to the instance that has the file).
+func streamFileSSE(w http.ResponseWriter, flusher http.Flusher, jobID int, filePath string) {
+	const chunkSize = 384 * 1024 // 384 KB binary -> ~512 KB base64 per event
+	f, err := os.Open(filePath)
+	if err != nil {
+		log.Printf("streamFileSSE job=%d: open %q: %v", jobID, filePath, err)
+		return
+	}
+	defer f.Close()
+
+	buf := make([]byte, chunkSize)
+	idx := 0
+	for {
+		n, err := io.ReadFull(f, buf)
+		if n > 0 {
+			chunk := base64.StdEncoding.EncodeToString(buf[:n])
+			b, _ := json.Marshal(map[string]any{
+				"type":  "file-chunk",
+				"id":    jobID,
+				"index": idx,
+				"data":  chunk,
+			})
+			fmt.Fprintf(w, "data: %s\n\n", b)
+			flusher.Flush()
+			idx++
+		}
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			break
+		}
+		if err != nil {
+			log.Printf("streamFileSSE job=%d: read err: %v", jobID, err)
+			return
+		}
+	}
+	b, _ := json.Marshal(map[string]any{"type": "file-done", "id": jobID, "chunks": idx})
+	fmt.Fprintf(w, "data: %s\n\n", b)
+	flusher.Flush()
+	log.Printf("streamFileSSE job=%d: sent %d chunks (%d KB/chunk)", jobID, idx, chunkSize/1024)
 }
 
 // handleDownload serves the mastered output WAV.
