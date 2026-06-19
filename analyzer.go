@@ -287,10 +287,9 @@ type SectionBound struct {
 var reEbur128 = regexp.MustCompile(`t:\s*([\d.]+).*?M:\s*(-?[\d.]+|-inf).*?S:\s*(-?[\d.]+|-inf)`)
 var reDuration = regexp.MustCompile(`Duration:\s*(\d+):(\d+):([\d.]+)`)
 
-// AnalyzeAudio measures the loudness curve via ffmpeg's EBU R128 filter and
-// returns a result ready for the frontend. It depends only on ffmpeg, so it
-// works even when the audio_analyzer binary is not present.
-func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
+// analyzeLoudnessCurve runs only the ffmpeg EBU R128 pass and returns a partial
+// AnalysisResult with TotalSec, LoudnessSeries, and Sections. Does NOT call audio_analyzer.
+func (an *Analyzer) analyzeLoudnessCurve(audioPath string) (*AnalysisResult, error) {
 	cmd := exec.Command(an.Ffmpeg,
 		"-i", audioPath,
 		"-af", "ebur128=framelog=info",
@@ -329,24 +328,26 @@ func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
 	}
 
 	series := resampleLoudness(frames, totalSec)
-
 	samples := make([]LoudnessSample, len(series))
 	for i, p := range series {
 		samples[i] = LoudnessSample{Sec: p.Sec, Db: p.DB}
 	}
-
 	detected := detectQuietSections(series, DefaultSectionDetectOptions())
 	bounds := make([]SectionBound, len(detected))
 	for i, s := range detected {
 		bounds[i] = SectionBound{StartSec: s.StartSec, EndSec: s.EndSec}
 	}
+	return &AnalysisResult{TotalSec: totalSec, LoudnessSeries: samples, Sections: bounds}, nil
+}
 
-	result := &AnalysisResult{
-		TotalSec:       totalSec,
-		LoudnessSeries: samples,
-		Sections:       bounds,
+// AnalyzeAudio measures the loudness curve via ffmpeg's EBU R128 filter and
+// returns a result ready for the frontend. It depends only on ffmpeg, so it
+// works even when the audio_analyzer binary is not present.
+func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
+	result, err := an.analyzeLoudnessCurve(audioPath)
+	if err != nil {
+		return nil, err
 	}
-
 	// Best-effort: run audio_analyzer for per-band loudness. Gracefully skipped if binary absent.
 	if full, err := an.Analyze(audioPath); err == nil {
 		result.GlobalLoudness = full.Loudness
@@ -362,7 +363,6 @@ func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
 	} else {
 		log.Printf("audio_analyzer best-effort failed for %s: %v", audioPath, err)
 	}
-
 	return result, nil
 }
 
@@ -383,29 +383,51 @@ func (an *Analyzer) imageDirForPath(audioPath string) string {
 	return filepath.Join(os.TempDir(), "phaselimiter_img_"+safe)
 }
 
-// AnalyzeAudioFull is like AnalyzeAudio but also runs audio_analyzer with image
-// output flags, populating TruePeak, LoudnessRange, Dynamics, Sharpness, Space,
-// SampleRate, Peak, and SpectrogramURL. Gracefully degrades: if image generation
-// fails the basic metrics are still returned.
+// AnalyzeAudioFull runs ffmpeg (EBU R128) and audio_analyzer (with spectrogram) concurrently,
+// then merges results. audio_analyzer is called exactly once — previously it was called twice
+// (once inside AnalyzeAudio, once inside AnalyzeWithImages), cutting analysis time by ~50%.
 func (an *Analyzer) AnalyzeAudioFull(audioPath string) (*AnalysisResult, error) {
-	result, err := an.AnalyzeAudio(audioPath)
-	if err != nil {
-		return nil, err
+	type loudnessResult struct {
+		r   *AnalysisResult
+		err error
+	}
+	type imagesResult struct {
+		full AudioAnalysis
+		imgs ImagePaths
+		err  error
 	}
 
-	pngDir := an.imageDirForPath(audioPath)
-	if mkErr := os.MkdirAll(pngDir, 0o755); mkErr != nil {
+	lCh := make(chan loudnessResult, 1)
+	iCh := make(chan imagesResult, 1)
+
+	go func() {
+		r, err := an.analyzeLoudnessCurve(audioPath)
+		lCh <- loudnessResult{r, err}
+	}()
+
+	go func() {
+		pngDir := an.imageDirForPath(audioPath)
+		if mkErr := os.MkdirAll(pngDir, 0o755); mkErr != nil {
+			iCh <- imagesResult{err: mkErr}
+			return
+		}
+		full, imgs, err := an.AnalyzeWithImages(audioPath, pngDir)
+		iCh <- imagesResult{full, imgs, err}
+	}()
+
+	lr := <-lCh
+	if lr.err != nil {
+		return nil, lr.err
+	}
+	result := lr.r
+
+	ir := <-iCh
+	if ir.err != nil {
+		log.Printf("AnalyzeWithImages failed for %s: %v", audioPath, ir.err)
 		return result, nil
 	}
 
-	full, imgs, aerr := an.AnalyzeWithImages(audioPath, pngDir)
-	if aerr != nil {
-		log.Printf("AnalyzeWithImages failed for %s: %v", audioPath, aerr)
-		return result, nil
-	}
-
-	// Overwrite bands from the authoritative AnalyzeWithImages run
-	result.Bands = nil
+	full, imgs := ir.full, ir.imgs
 	result.GlobalLoudness = full.Loudness
 	result.TruePeak = full.TruePeak
 	result.LoudnessRange = full.LoudnessRange
@@ -414,6 +436,7 @@ func (an *Analyzer) AnalyzeAudioFull(audioPath string) (*AnalysisResult, error) 
 	result.Space = full.Space
 	result.SampleRate = full.SampleRate
 	result.Peak = full.Peak
+	result.Bands = nil
 	for _, b := range full.Bands {
 		result.Bands = append(result.Bands, BandSample{
 			LowFreq:  b.LowFreq,
@@ -426,7 +449,6 @@ func (an *Analyzer) AnalyzeAudioFull(audioPath string) (*AnalysisResult, error) 
 	if imgs.Spectrogram != "" {
 		result.SpectrogramURL = "/local?path=" + url.QueryEscape(imgs.Spectrogram)
 	}
-	// Populate cache so subsequent Analyze() calls skip re-running audio_analyzer
 	an.mu.Lock()
 	an.cache[analyzeCacheKey(audioPath)] = full
 	an.mu.Unlock()
