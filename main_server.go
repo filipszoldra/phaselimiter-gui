@@ -179,6 +179,47 @@ func handleDebug(execDir string) http.HandlerFunc {
 			}
 			fmt.Fprintf(&sb, "=== audio_analyzer smoke (exit=%v) ===\nstdout: %s\nstderr: %s\n",
 				aaErr, jsonOut, tail(aaStderr.String(), 1000))
+
+			// Spectrogram smoke test.
+			spectroPath := filepath.Join(os.TempDir(), "pl_debug_spectro.png")
+			defer os.Remove(spectroPath)
+			aaSpCmd := exec.Command(aaPath,
+				"--mode", "default",
+				"--input", silenceWav,
+				"--sound_quality2=false",
+				"--sound_quality2_cache", cachePath,
+				"--analysis_data_dir", analysisDir,
+				"--spectrogram_output", spectroPath,
+				"--quick_exit", "false",
+			)
+			aaSpCmd.Env = os.Environ()
+			aaSpErr := aaSpCmd.Run()
+			if info, statErr := os.Stat(spectroPath); statErr == nil {
+				fmt.Fprintf(&sb, "=== spectrogram smoke (exit=%v) ===\nPNG size=%d bytes\n\n", aaSpErr, info.Size())
+			} else {
+				fmt.Fprintf(&sb, "=== spectrogram smoke (exit=%v) ===\nPNG not created: %v\n\n", aaSpErr, statErr)
+			}
+
+			// Phase_limiter limiter-only smoke (bypasses auto_mastering5 / sound_quality2_cache).
+			plPath := filepath.Join(binDir, "phase_limiter")
+			plOutPath := filepath.Join(os.TempDir(), "pl_debug_out.wav")
+			defer os.Remove(plOutPath)
+			plCmd := exec.Command(plPath,
+				"--input", silenceWav,
+				"--output", plOutPath,
+				"--ffmpeg", ffmpegPath,
+				"--sound_quality2_cache", cachePath,
+				"--mastering", "false",
+				"--reference", "-14",
+				"--ceiling", "-1",
+				"--max_iter1", "10",
+				"--limiter_internal_oversample", "1",
+				"--pre_compression", "false",
+			)
+			plCmd.Env = os.Environ()
+			plOut, plErr := plCmd.CombinedOutput()
+			fmt.Fprintf(&sb, "=== phase_limiter limiter-only smoke (exit=%v) ===\n%s\n",
+				plErr, tail(string(plOut), 1000))
 		}
 
 		w.Write([]byte(sb.String()))

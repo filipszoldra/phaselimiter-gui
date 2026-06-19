@@ -199,13 +199,14 @@ function jobRowHTML(j) {
   const statusText = j.status === "processing" ? `${pct}%` : j.status;
   const outDisplay = IS_SERVER && j.status === "succeeded" && j.output
     ? `<a href="${j.output}" download="output.wav" class="job-download-link">⬇ Download</a>`
-    : `→ ${j.output}${j.message ? " · " + j.message : ""}`;
+    : `→ ${j.output || ""}${j.message ? " · " + j.message : ""}`;
+  const outClass = j.status === "failed" ? "job-out job-out-failed" : "job-out";
   return `
     <div class="job-top">
       <span class="job-name" title="${baseName(j.input)}">${baseName(j.input)}</span>
       <span class="job-status ${statusClass}">${statusText}</span>
     </div>
-    <p class="job-out">${outDisplay}</p>
+    <p class="${outClass}">${outDisplay}</p>
     <div class="job-bar"><div style="width:${pct}%"></div></div>`;
 }
 

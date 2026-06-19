@@ -320,11 +320,17 @@ func handleAnalyze(an *Analyzer) http.HandlerFunc {
 		if strings.HasPrefix(result.SpectrogramURL, "/local?path=") {
 			encoded := strings.TrimPrefix(result.SpectrogramURL, "/local?path=")
 			imgPath, _ := url.QueryUnescape(encoded)
-			if imgPath != "" && fileExists(imgPath) {
+			exists := imgPath != "" && fileExists(imgPath)
+			log.Printf("spectrogram rewrite: path=%q exists=%v", imgPath, exists)
+			if exists {
 				tok := newToken()
 				storeToken(tok, imgPath, []string{imgPath})
 				result.SpectrogramURL = "/api/files/" + tok
 			}
+		} else if result.SpectrogramURL != "" {
+			log.Printf("spectrogram URL unexpected format: %q", result.SpectrogramURL)
+		} else {
+			log.Printf("spectrogram URL empty after analysis")
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -530,11 +536,17 @@ func handleAnalyzeByToken(an *Analyzer) http.HandlerFunc {
 		if strings.HasPrefix(result.SpectrogramURL, "/local?path=") {
 			encoded := strings.TrimPrefix(result.SpectrogramURL, "/local?path=")
 			imgPath, _ := url.QueryUnescape(encoded)
-			if imgPath != "" && fileExists(imgPath) {
+			exists := imgPath != "" && fileExists(imgPath)
+			log.Printf("spectrogram rewrite (by-token): path=%q exists=%v", imgPath, exists)
+			if exists {
 				tok := newToken()
 				storeToken(tok, imgPath, []string{imgPath})
 				result.SpectrogramURL = "/api/files/" + tok
 			}
+		} else if result.SpectrogramURL != "" {
+			log.Printf("spectrogram URL unexpected format (by-token): %q", result.SpectrogramURL)
+		} else {
+			log.Printf("spectrogram URL empty after by-token analysis")
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)

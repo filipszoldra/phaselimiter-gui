@@ -89,8 +89,20 @@ jobs:
           cd phaselimiter-src && git sparse-checkout set resource && cd ..
           cp -r phaselimiter-src/resource phaselimiter/resource
           rm -rf phaselimiter-src
-          # sound_quality2_cache is gitignored in the engine repo — ship it from this repo.
-          cp resource_extra/sound_quality2_cache phaselimiter/resource/sound_quality2_cache
+          # sound_quality2_cache: boost::binary_archive from Windows is not portable to Linux.
+          # Re-generate it on Linux using audio_analyzer --mode sound_quality2_preparation
+          # with the 568 pre-computed analysis JSON files from analysis_data/.
+          # Falls back to Windows cache (which still causes mastering5 to crash) if this fails.
+          echo "=== generating Linux sound_quality2_cache ==="
+          LD_LIBRARY_PATH=phaselimiter/bin \
+            phaselimiter/bin/audio_analyzer \
+              --mode sound_quality2_preparation \
+              --sound_quality2_cache phaselimiter/resource/sound_quality2_cache \
+              --analysis_data_dir phaselimiter/resource/analysis_data \
+          && echo "Linux sound_quality2_cache generated OK" \
+          || { echo "WARNING: preparation failed — using Windows cache (mastering5 will crash)"; \
+               cp resource_extra/sound_quality2_cache phaselimiter/resource/sound_quality2_cache; }
+          ls -lh phaselimiter/resource/sound_quality2_cache || true
           echo "=== phaselimiter/resource ==="
           ls -lh phaselimiter/resource/
 

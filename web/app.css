@@ -226,6 +226,7 @@ details.eq-adv { margin-top: 10px; }
 .job-status.succeeded { background: rgba(107,191,115,.18); color: var(--ok); }
 .job-status.failed { background: rgba(224,90,90,.18); color: #e57373; }
 .job-out { font-size: 11px; color: var(--muted); margin: 4px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-out-failed { white-space: pre-wrap; overflow: visible; max-height: 6em; overflow-y: auto; text-overflow: unset; }
 .job-download-link { color: var(--accent-soft); text-decoration: none; font-weight: 500; }
 .job-download-link:hover { color: var(--accent); text-decoration: underline; }
 .job-bar { height: 5px; background: #2b323d; border-radius: 99px; overflow: hidden; margin-top: 9px; }
