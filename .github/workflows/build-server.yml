@@ -128,6 +128,7 @@ jobs:
             --memory 4Gi \
             --cpu 2 \
             --timeout 3600 \
+            --execution-environment gen2 \
             --quiet
           echo "Deployed: $(gcloud run services describe $SERVICE_NAME --region $GCP_REGION --format 'value(status.url)')"
 
