@@ -11,7 +11,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg \
       libsndfile1 \
       libgomp1 \
+      libboost-filesystem1.83.0 \
+      libboost-serialization1.83.0 \
+      libboost-iostreams1.83.0 \
       ca-certificates \
+    && ln -sf /usr/lib/x86_64-linux-gnu/libboost_filesystem.so.1.83.0 \
+              /usr/lib/x86_64-linux-gnu/libboost_filesystem.so.1.82.0 \
+    && ln -sf /usr/lib/x86_64-linux-gnu/libboost_serialization.so.1.83.0 \
+              /usr/lib/x86_64-linux-gnu/libboost_serialization.so.1.82.0 \
+    && ln -sf /usr/lib/x86_64-linux-gnu/libboost_iostreams.so.1.83.0 \
+              /usr/lib/x86_64-linux-gnu/libboost_iostreams.so.1.82.0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
