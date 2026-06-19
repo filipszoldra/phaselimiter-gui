@@ -89,6 +89,7 @@ const chk = (id) => el(id).checked;
 const baseName = (p) => p instanceof File ? p.name : String(p).replace(/^.*[\\/]/, "");
 
 const _jobStartTime = new Map(); // jobId -> performance.now() when progress first > 0
+const _jobBlobUrls  = new Map(); // jobId -> blob: URL of mastered output (cached immediately on success)
 
 // ---------------------------------------------------------------------------
 // Settings <-> live readouts
@@ -211,8 +212,9 @@ function jobRowHTML(j) {
       statusText = `${pct}%`;
     }
   }
+  const downloadHref = _jobBlobUrls.get(j.id) || j.output || "";
   const outDisplay = IS_SERVER && j.status === "succeeded" && j.output
-    ? `<a href="${j.output}" download="output.wav" class="job-download-link">⬇ Download</a>`
+    ? `<a href="${downloadHref}" download="output.wav" class="job-download-link">⬇ Download</a>`
     : `→ ${j.output || ""}${j.message ? " · " + j.message : ""}`;
   const outClass = j.status === "failed" ? "job-out job-out-failed" : "job-out";
   return `
@@ -247,9 +249,27 @@ function renderJob(j) {
 
   if (j.status === "succeeded" && !node.dataset.resultFetched) {
     node.dataset.resultFetched = "1";
+    // Fetch and cache output as blob immediately — before Cloud Run can replace the instance.
+    // The Download link uses the cached blob URL so a future instance swap doesn't break it.
+    if (IS_SERVER && j.output && !_jobBlobUrls.has(j.id)) cacheOutputBlob(j);
     fetchJobResult(j, node);
   }
   updateOverallProgress();
+}
+
+async function cacheOutputBlob(j) {
+  try {
+    const resp = await fetch(j.output);
+    if (!resp.ok) return;
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    _jobBlobUrls.set(j.id, blobUrl);
+    // Patch href on already-rendered link
+    const link = document.querySelector(`.job[data-id="${j.id}"] .job-download-link`);
+    if (link) link.href = blobUrl;
+  } catch (e) {
+    console.warn("output blob cache failed:", e);
+  }
 }
 
 async function fetchJobResult(j, node) {
@@ -277,7 +297,7 @@ async function fetchJobResult(j, node) {
     panel.innerHTML = renderJobResultHTML(inResult, outResult);
     node.appendChild(panel);
     if (IS_SERVER && meta?.inputFile) {
-      renderABPlayer(panel, meta.inputFile, j.output, inResult, outResult);
+      renderABPlayer(panel, meta.inputFile, _jobBlobUrls.get(j.id) || j.output, inResult, outResult);
     }
     renderJobCompareEQ(panel.querySelector(".jr-eq-canvas"), inResult, outResult);
     renderJobCompareLoudness(panel.querySelector(".jr-loud-canvas"), inResult, outResult);
@@ -1930,3 +1950,6 @@ async function init() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
+window.addEventListener("beforeunload", () => {
+  for (const url of _jobBlobUrls.values()) URL.revokeObjectURL(url);
+});
