@@ -205,7 +205,8 @@ function jobRowHTML(j) {
     if (p > 0.02 && start != null) {
       const elapsed = (performance.now() - start) / 1000;
       const remaining = Math.ceil(elapsed * (1 - p) / p);
-      statusText = `${pct}% · ~${remaining}s`;
+      const mins = Math.ceil(remaining / 60);
+      statusText = mins >= 1 ? `${pct}% · ~${mins} min left` : `${pct}% · <1 min left`;
     } else {
       statusText = `${pct}%`;
     }
@@ -1690,6 +1691,12 @@ async function startAnalyze(forcePath) {
   btn.disabled = true;
   btn.textContent = "Analyzing...";
   el("analysisProgress").classList.remove("hidden");
+  // Open the drawer immediately with a loading note so user knows it's running
+  el("analysisMetrics").innerHTML = `<div class="analysis-loading-note">Analyzing track — this may take a few minutes...</div>`;
+  el("analysisMetrics").classList.remove("hidden");
+  el("analysisSpectro").innerHTML = "";
+  el("analysisSpectro").classList.add("hidden");
+  openAnalysisDrawer();
   try {
     const result = await bridge.analyzeFull(inputPath);
     if (result) {

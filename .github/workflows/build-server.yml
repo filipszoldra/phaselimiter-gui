@@ -137,7 +137,8 @@ jobs:
             --region "$GCP_REGION" \
             --platform managed \
             --allow-unauthenticated \
-            --max-instances 2 \
+            --min-instances 1 \
+            --max-instances 1 \
             --concurrency 1 \
             --memory 4Gi \
             --cpu 2 \

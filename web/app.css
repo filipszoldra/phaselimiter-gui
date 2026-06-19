@@ -254,6 +254,8 @@ details.eq-adv { margin-top: 10px; }
 .ab-metrics span { color: var(--muted); }
 .ab-metrics strong { color: var(--text); }
 
+.analysis-loading-note { color: var(--muted); font-size: 12px; font-style: italic; padding: 8px 0; }
+
 /* ---------- analysis drawer ---------- */
 .analysis-backdrop { position: fixed; inset: 0; z-index: 9; background: transparent; }
 .analysis-drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 380px; background: var(--bg-2);
