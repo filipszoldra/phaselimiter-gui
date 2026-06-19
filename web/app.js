@@ -258,17 +258,20 @@ function renderJob(j) {
 }
 
 async function cacheOutputBlob(j) {
-  try {
-    const resp = await fetch(j.output);
-    if (!resp.ok) return;
-    const blob = await resp.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    _jobBlobUrls.set(j.id, blobUrl);
-    // Patch href on already-rendered link
-    const link = document.querySelector(`.job[data-id="${j.id}"] .job-download-link`);
-    if (link) link.href = blobUrl;
-  } catch (e) {
-    console.warn("output blob cache failed:", e);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
+      const resp = await fetch(j.output);
+      if (!resp.ok) return; // 404 — token wygasł, retry bez sensu
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      _jobBlobUrls.set(j.id, blobUrl);
+      const link = document.querySelector(`.job[data-id="${j.id}"] .job-download-link`);
+      if (link) link.href = blobUrl;
+      return;
+    } catch (e) {
+      if (attempt === 3) console.warn("output blob cache failed after retries:", e);
+    }
   }
 }
 
@@ -283,15 +286,16 @@ async function fetchJobResult(j, node) {
     if (IS_SERVER) {
       meta = _serverJobMeta.get(j.id);
       if (!meta || !meta.outputToken) { loadBar.remove(); return; }
-      inAnalyzePromise = meta.inputFile ? bridge.analyzeFull(meta.inputFile) : Promise.resolve(null);
-      outAnalyzePromise = fetch("/api/analyze-by-token/" + meta.outputToken).then(r => r.json());
+      inAnalyzePromise = meta.inputFile ? bridge.analyzeFull(meta.inputFile).catch(() => null) : Promise.resolve(null);
+      outAnalyzePromise = fetch("/api/analyze-by-token/" + meta.outputToken)
+        .then(r => r.ok ? r.json() : null).catch(() => null);
     } else {
       inAnalyzePromise = bridge.analyzeFull(j.input);
       outAnalyzePromise = bridge.analyzeFull(j.output);
     }
     const [inResult, outResult] = await Promise.all([inAnalyzePromise, outAnalyzePromise]);
     loadBar.remove();
-    if (!outResult) return;
+    if (!inResult && !outResult) return;
     const panel = document.createElement("div");
     panel.className = "job-result";
     panel.innerHTML = renderJobResultHTML(inResult, outResult);
