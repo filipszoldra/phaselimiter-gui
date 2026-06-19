@@ -509,7 +509,23 @@ func handleDownload() http.HandlerFunc {
 		token := filepath.Base(r.URL.Path)
 		filePath, ok := lookupToken(token)
 		if !ok {
+			// Filesystem fallback: token may have been evicted from memory (GC or restart)
+			// but the file may still exist on this instance (same /tmp, same revision).
+			fallbackPath := filepath.Join(os.TempDir(), "pl_out_"+token+".wav")
+			if fi, statErr := os.Stat(fallbackPath); statErr == nil && fi.Size() > 0 {
+				log.Printf("download: token=%q not in store — filesystem fallback OK, size=%d", token, fi.Size())
+				w.Header().Set("Content-Disposition", `attachment; filename="output.wav"`)
+				http.ServeFile(w, r, fallbackPath)
+				return
+			}
+			log.Printf("download: token=%q not in store, no filesystem fallback — 404", token)
 			http.Error(w, "not found or expired", http.StatusNotFound)
+			return
+		}
+		log.Printf("download: token=%q found in store, path=%q", token, filePath)
+		if fi, statErr := os.Stat(filePath); statErr != nil || fi.Size() == 0 {
+			log.Printf("download: token=%q file missing or empty: statErr=%v", token, statErr)
+			http.Error(w, "file missing on server", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Disposition", `attachment; filename="output.wav"`)

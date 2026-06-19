@@ -247,6 +247,38 @@ func handleDebug(execDir string) http.HandlerFunc {
 				plErr2, tail(string(plOut2), 500))
 		}
 
+		// Token store snapshot (count + oldest/newest age).
+		var count int
+		var oldest, newest time.Duration
+		tokenStore.Range(func(k, v any) bool {
+			count++
+			e := v.(*tokenEntry)
+			age := time.Since(e.created)
+			if count == 1 || age > oldest {
+				oldest = age
+			}
+			if count == 1 || age < newest {
+				newest = age
+			}
+			return true
+		})
+		fmt.Fprintf(&sb, "=== token store ===\ncount=%d  oldest=%.0fs  newest=%.0fs\n\n",
+			count, oldest.Seconds(), newest.Seconds())
+
+		// /tmp contents relevant to phaselimiter.
+		tmpEntries, _ := os.ReadDir(os.TempDir())
+		var plFiles []string
+		for _, e := range tmpEntries {
+			if strings.HasPrefix(e.Name(), "pl_") {
+				plFiles = append(plFiles, e.Name())
+			}
+		}
+		fmt.Fprintf(&sb, "=== /tmp pl_* files (%d) ===\n", len(plFiles))
+		for _, f := range plFiles {
+			fmt.Fprintf(&sb, "  %s\n", f)
+		}
+		fmt.Fprintln(&sb)
+
 		w.Write([]byte(sb.String()))
 	}
 }
