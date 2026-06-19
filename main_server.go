@@ -144,7 +144,12 @@ func handleDebug(execDir string) http.HandlerFunc {
 					fmt.Fprintf(&sb, "  ... (%d more)\n", len(aEntries)-5)
 					break
 				}
-				fmt.Fprintf(&sb, "  %s\n", e.Name())
+				info, _ := e.Info()
+				size := int64(0)
+				if info != nil {
+					size = info.Size()
+				}
+				fmt.Fprintf(&sb, "  %s  %d bytes\n", e.Name(), size)
 			}
 			fmt.Fprintln(&sb)
 		}
@@ -200,11 +205,31 @@ func handleDebug(execDir string) http.HandlerFunc {
 				fmt.Fprintf(&sb, "=== spectrogram smoke (exit=%v) ===\nPNG not created: %v\n\n", aaSpErr, statErr)
 			}
 
-			// Phase_limiter limiter-only smoke (bypasses auto_mastering5 / sound_quality2_cache).
+			// Phase_limiter mastering5 smoke (production args — tests auto_mastering5 + cache).
 			plPath := filepath.Join(binDir, "phase_limiter")
 			plOutPath := filepath.Join(os.TempDir(), "pl_debug_out.wav")
 			defer os.Remove(plOutPath)
 			plCmd := exec.Command(plPath,
+				"--input", silenceWav,
+				"--output", plOutPath,
+				"--ffmpeg", ffmpegPath,
+				"--sound_quality2_cache", cachePath,
+				"--mastering", "true",
+				"--mastering_mode", "mastering5",
+				"--mastering5_mastering_level", "0.4",
+				"--reference", "-14",
+				"--ceiling", "-1",
+				"--max_iter1", "10",
+				"--limiter_internal_oversample", "1",
+				"--pre_compression", "false",
+			)
+			plCmd.Env = os.Environ()
+			plOut, plErr := plCmd.CombinedOutput()
+			fmt.Fprintf(&sb, "=== phase_limiter mastering5 smoke (exit=%v) ===\n%s\n",
+				plErr, tail(string(plOut), 2000))
+
+			// Phase_limiter limiter-only smoke (no mastering_mode — triggers AutoMastering classic).
+			plCmd2 := exec.Command(plPath,
 				"--input", silenceWav,
 				"--output", plOutPath,
 				"--ffmpeg", ffmpegPath,
@@ -216,10 +241,10 @@ func handleDebug(execDir string) http.HandlerFunc {
 				"--limiter_internal_oversample", "1",
 				"--pre_compression", "false",
 			)
-			plCmd.Env = os.Environ()
-			plOut, plErr := plCmd.CombinedOutput()
+			plCmd2.Env = os.Environ()
+			plOut2, plErr2 := plCmd2.CombinedOutput()
 			fmt.Fprintf(&sb, "=== phase_limiter limiter-only smoke (exit=%v) ===\n%s\n",
-				plErr, tail(string(plOut), 1000))
+				plErr2, tail(string(plOut2), 500))
 		}
 
 		w.Write([]byte(sb.String()))
