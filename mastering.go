@@ -186,6 +186,7 @@ func (m Mastering) execute(update chan Mastering) {
 	m.Status = MasteringStatusProcessing
 	update <- m
 
+	log.Printf("engine cmd [job %d]: %s %v", m.Id, m.PhaselimiterPath, args)
 	if err = cmd.Start(); err != nil {
 		m.Status = MasteringStatusFailed
 		m.Message = "failed to start command: " + err.Error()
@@ -207,14 +208,13 @@ func (m Mastering) execute(update chan Mastering) {
 	if err = cmd.Wait(); err != nil {
 		se := strings.TrimSpace(stderrBuf.String())
 		if se != "" {
-			if len(se) > 1000 {
-				se = se[:1000] + "..."
-			}
-			log.Printf("engine stderr [job %d]: %s", m.Id, se)
+			// Log full stderr to Cloud Run logs (no truncation).
+			log.Printf("engine stderr FULL [job %d]:\n%s", m.Id, se)
 		}
 		msg := "command failed: " + err.Error()
 		if se != "" {
-			msg += "; stderr: " + se
+			// Show last 2000 chars in SSE message (tail: error is at the end).
+			msg += "; stderr: " + tail(se, 2000)
 		}
 		m.Status = MasteringStatusFailed
 		m.Message = msg

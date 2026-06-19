@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/url"
 	"os"
@@ -357,6 +358,8 @@ func (an *Analyzer) AnalyzeAudio(audioPath string) (*AnalysisResult, error) {
 				SideMean: b.SideMean,
 			})
 		}
+	} else {
+		log.Printf("audio_analyzer best-effort failed for %s: %v", audioPath, err)
 	}
 
 	return result, nil
@@ -396,6 +399,7 @@ func (an *Analyzer) AnalyzeAudioFull(audioPath string) (*AnalysisResult, error) 
 
 	full, imgs, aerr := an.AnalyzeWithImages(audioPath, pngDir)
 	if aerr != nil {
+		log.Printf("AnalyzeWithImages failed for %s: %v", audioPath, aerr)
 		return result, nil
 	}
 

@@ -1572,7 +1572,17 @@ function animatePlayhead() {
 function playfrom(sec) {
   if (!state.analyzedPath) return;
   const audio = getAudio();
-  const src = "/local?path=" + encodeURIComponent(state.analyzedPath);
+  let src;
+  if (IS_SERVER && state.analyzedPath instanceof File) {
+    if (!state._analyzedObjectURL) {
+      state._analyzedObjectURL = URL.createObjectURL(state.analyzedPath);
+    }
+    src = state._analyzedObjectURL;
+  } else if (IS_SERVER && typeof state.analyzedPath === "string" && state.analyzedPath.startsWith("/api/")) {
+    src = state.analyzedPath;
+  } else {
+    src = "/local?path=" + encodeURIComponent(state.analyzedPath);
+  }
   if (audio.getAttribute("data-src") !== src) {
     audio.src = src;
     audio.setAttribute("data-src", src);
@@ -1665,6 +1675,7 @@ async function startAnalyze(forcePath) {
   try {
     const result = await bridge.analyzeFull(inputPath);
     if (result) {
+      if (state._analyzedObjectURL) { URL.revokeObjectURL(state._analyzedObjectURL); state._analyzedObjectURL = null; }
       state.analyzedPath = inputPath;
       state.loudnessSeries = result.loudnessSeries || [];
       state.secTotalSec = result.totalSec
