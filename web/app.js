@@ -289,7 +289,22 @@ async function fetchJobResult(j, node) {
       if (!meta || !meta.outputToken) { loadBar.remove(); return; }
       inAnalyzePromise = meta.inputFile ? bridge.analyzeFull(meta.inputFile).catch(() => null) : Promise.resolve(null);
       outAnalyzePromise = fetch("/api/analyze-by-token/" + meta.outputToken)
-        .then(r => r.ok ? r.json() : null).catch(() => null);
+        .then(r => r.ok ? r.json() : null).catch(() => null)
+        .then(async result => {
+          if (result) return result;
+          // Token lookup failed (wrong instance after deploy). Wait for the inline SSE blob
+          // then re-upload it for analysis — gives us spectrograms + per-band data anyway.
+          for (let i = 0; i < 90 && !_jobBlobUrls.has(j.id); i++) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
+          const blobUrl = _jobBlobUrls.get(j.id);
+          if (!blobUrl) return null;
+          try {
+            const r = await fetch(blobUrl);
+            const blob = await r.blob();
+            return await bridge.analyzeFull(new File([blob], "output.wav"));
+          } catch { return null; }
+        });
     } else {
       inAnalyzePromise = bridge.analyzeFull(j.input);
       outAnalyzePromise = bridge.analyzeFull(j.output);
@@ -482,10 +497,10 @@ function renderJobResultHTML(inR, outR) {
   ].filter(Boolean).join("");
   return `
     <div class="job-result-head">
-      <span class="job-result-toggle">+</span>
-      <span>Mastering comparison</span>
+      <span class="job-result-toggle">-</span>
+      <span>Input / Output comparison</span>
     </div>
-    <div class="job-result-body hidden">
+    <div class="job-result-body">
       ${metricsHTML}
       <div class="jr-chart-section"><span class="jr-chart-label">Per-band level</span><div class="jr-eq-canvas"></div></div>
       <div class="jr-chart-section"><span class="jr-chart-label">Loudness over time</span><div class="jr-loud-canvas"></div></div>
@@ -923,12 +938,13 @@ async function _streamOneMasterJob(file, settings) {
             }
 
             lastId = jv.id;
-            window.plOnJobUpdate(jv);
+            // Set metadata BEFORE plOnJobUpdate so fetchJobResult can read it synchronously.
             if (jv.status === "succeeded") {
               const tok = jv.output ? jv.output.replace("/api/download/", "") : null;
               _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok });
-              // Do NOT return here — wait for file-done (file data streams next).
             }
+            window.plOnJobUpdate(jv);
+            // Do NOT return after succeeded — wait for file-done (file data streams next).
             if (jv.status === "failed") return;
           } catch (_) {}
         }
