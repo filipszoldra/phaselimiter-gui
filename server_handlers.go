@@ -414,6 +414,11 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 		// Register download token before job completes so it's ready when SSE fires.
 		storeToken(outTok, outPath, []string{inPath, outPath})
 
+		// Register a separate read-only token for input analysis in the comparison panel.
+		// outTok already owns cleanup of inPath; this token has no cleanup list.
+		inAnalyzeTok := newToken()
+		storeToken(inAnalyzeTok, inPath, []string{})
+
 		// Use a background context so the engine keeps running if the SSE client
 		// disconnects mid-job. r.Context() cancellation (client disconnect) would
 		// SIGKILL the engine after only a few seconds, causing "signal: killed".
@@ -478,12 +483,14 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 				jv.Input = inputName
 				if upd.Status == MasteringStatusSucceeded {
 					jv.Output = "/api/download/" + outTok
+					jv.InputAnalyzeToken = "/api/analyze-by-token/" + inAnalyzeTok
 				}
 				sendSSE(w, flusher, jv)
 				if upd.Status == MasteringStatusSucceeded || upd.Status == MasteringStatusFailed {
 					if upd.Status == MasteringStatusFailed {
 						// Job failed — clean up input; output may not exist.
 						deleteTokenEntry(outTok)
+						unstoreToken(inAnalyzeTok)
 						os.Remove(inPath)
 					} else {
 						// Stream the output WAV inline so the browser gets a blob URL on the

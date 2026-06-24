@@ -286,7 +286,13 @@ async function fetchJobResult(j, node) {
     if (IS_SERVER) {
       meta = _serverJobMeta.get(j.id);
       if (!meta || !meta.outputToken) { loadBar.remove(); return; }
-      inAnalyzePromise = meta.inputFile ? bridge.analyzeFull(meta.inputFile).catch(() => null) : Promise.resolve(null);
+      if (meta.inputToken) {
+        inAnalyzePromise = fetch(meta.inputToken)
+          .then(r => r.ok ? r.json() : null).catch(() => null)
+          .then(r => r || (meta.inputFile ? bridge.analyzeFull(meta.inputFile).catch(() => null) : null));
+      } else {
+        inAnalyzePromise = meta.inputFile ? bridge.analyzeFull(meta.inputFile).catch(() => null) : Promise.resolve(null);
+      }
       outAnalyzePromise = fetch("/api/analyze-by-token/" + meta.outputToken)
         .then(r => r.ok ? r.json() : null).catch(() => null)
         .then(async result => {
@@ -940,7 +946,7 @@ async function _streamOneMasterJob(file, settings) {
             // Set metadata BEFORE plOnJobUpdate so fetchJobResult can read it synchronously.
             if (jv.status === "succeeded") {
               const tok = jv.output ? jv.output.replace("/api/download/", "") : null;
-              _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok });
+              _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok, inputToken: jv.inputAnalyzeToken || null });
             }
             window.plOnJobUpdate(jv);
             // Do NOT return after succeeded — wait for file-done (file data streams next).

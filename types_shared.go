@@ -3,12 +3,13 @@ package main
 // JobView is the row the frontend renders for one mastering job.
 // Shared between the Windows WebView2 host (bridge.go) and the Linux HTTP server.
 type JobView struct {
-	ID       int     `json:"id"`
-	Input    string  `json:"input"`
-	Output   string  `json:"output"`
-	Status   string  `json:"status"`
-	Progress float64 `json:"progress"`
-	Message  string  `json:"message"`
+	ID                 int     `json:"id"`
+	Input              string  `json:"input"`
+	Output             string  `json:"output"`
+	Status             string  `json:"status"`
+	Progress           float64 `json:"progress"`
+	Message            string  `json:"message"`
+	InputAnalyzeToken  string  `json:"inputAnalyzeToken,omitempty"`
 }
 
 func toJobView(m Mastering) JobView {
