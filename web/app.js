@@ -597,7 +597,10 @@ function renderJobCompareLoudness(container, inR, outR) {
   });
   const drawSeries = (series, cls) => {
     if (!series?.length) return;
-    const pts = series.map(p => `${xOf(p.sec).toFixed(1)},${yOf(p.db).toFixed(1)}`).join(" ");
+    let end = series.length;
+    while (end > 0 && series[end - 1].db <= yMin) end--;
+    if (!end) return;
+    const pts = series.slice(0, end).map(p => `${xOf(p.sec).toFixed(1)},${yOf(p.db).toFixed(1)}`).join(" ");
     const pl = document.createElementNS(ns, "polyline");
     pl.setAttribute("points", pts); pl.setAttribute("class", cls);
     pl.setAttribute("clip-path", `url(#${clipId})`);
