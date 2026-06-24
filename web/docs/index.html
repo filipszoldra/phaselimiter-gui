@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>phaselimiter - dokumentacja / docs</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #16191f;
+  --bg-2:       #1c2027;
+  --card:       #21262f;
+  --card-2:     #262c36;
+  --line:       #333b47;
+  --line-soft:  #2a313b;
+  --text:       #e9e7e3;
+  --muted:      #99a1ad;
+  --accent:     #d6409f;
+  --accent-soft:#ec7ac4;
+  --accent-dim: #5e2350;
+  --ok:         #6bbf73;
+  --radius:     14px;
+  --radius-sm:  9px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+a { color: var(--accent-soft); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------- topbar ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  height: 52px;
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+  flex: 1;
+}
+.topbar-brand .logo {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.topbar-brand .subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 1px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--card-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn:hover { background: #2c333e; border-color: #3c4552; text-decoration: none; }
+.btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-soft); }
+.lang-btns { display: flex; gap: 4px; }
+
+/* ---------- layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  max-width: 1100px;
+  margin: 0 auto;
+  gap: 0;
+  min-height: calc(100vh - 52px);
+}
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  position: sticky;
+  top: 52px;
+  height: calc(100vh - 52px);
+  overflow-y: auto;
+  padding: 24px 0 24px 20px;
+  border-right: 1px solid var(--line-soft);
+}
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+.nav-section {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 12px 12px 4px;
+}
+.nav-link {
+  display: block;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 13px;
+  transition: background .1s, color .1s;
+}
+.nav-link:hover { background: var(--card); color: var(--text); text-decoration: none; }
+.nav-link.active { background: var(--accent-dim); color: var(--accent-soft); }
+
+/* ---------- content ---------- */
+.content {
+  padding: 32px 36px 80px;
+  max-width: 760px;
+}
+
+h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+h2 {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 40px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-soft);
+  scroll-margin-top: 68px;
+}
+h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-soft);
+  margin: 24px 0 8px;
+  scroll-margin-top: 68px;
+}
+h4 { font-size: 13px; font-weight: 600; margin: 16px 0 4px; color: var(--text); }
+p { margin-bottom: 10px; color: var(--text); }
+li { margin-bottom: 4px; }
+ul, ol { padding-left: 20px; margin-bottom: 12px; }
+
+.lead {
+  font-size: 15px;
+  color: var(--muted);
+  margin-bottom: 24px;
+  line-height: 1.7;
+}
+
+/* ---------- step card ---------- */
+.step-list { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.step-item {
+  display: flex;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.step-num {
+  width: 26px;
+  height: 26px;
+  background: var(--accent-dim);
+  color: var(--accent-soft);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.step-body { flex: 1; }
+.step-title { font-weight: 600; margin-bottom: 3px; }
+.step-desc { color: var(--muted); font-size: 13px; }
+
+/* ---------- control card ---------- */
+.ctrl-section {
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  margin: 16px 0;
+  overflow: hidden;
+}
+.ctrl-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--card-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+.step-badge {
+  width: 22px;
+  height: 22px;
+  background: var(--accent-dim);
+  color: var(--accent-soft);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.ctrl-section-title { font-weight: 600; font-size: 14px; }
+.ctrl-section-body { padding: 12px 16px; display: flex; flex-direction: column; gap: 14px; }
+
+.ctrl-row { display: grid; grid-template-columns: 180px 1fr; gap: 8px; align-items: start; }
+.ctrl-name { font-weight: 600; font-size: 13px; }
+.ctrl-range {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+}
+.ctrl-desc { color: var(--muted); font-size: 13px; }
+.ctrl-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ok);
+}
+
+/* ---------- pipeline ---------- */
+.pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 20px 0;
+}
+.pipe-step {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+.pipe-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 40px;
+  flex-shrink: 0;
+}
+.pipe-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  margin-top: 14px;
+}
+.pipe-line {
+  width: 2px;
+  flex: 1;
+  background: var(--line);
+  margin: 2px 0;
+}
+.pipe-step:last-child .pipe-line { display: none; }
+.pipe-card {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin: 4px 0;
+}
+.pipe-card-title { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+.pipe-card-desc { font-size: 12px; color: var(--muted); }
+
+/* ---------- glossary table ---------- */
+.glossary { display: flex; flex-direction: column; gap: 1px; margin: 16px 0; }
+.gloss-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--card);
+  border-radius: 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.gloss-row:first-child { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.gloss-row:last-child { border-radius: 0 0 var(--radius-sm) var(--radius-sm); border-bottom: none; }
+.gloss-term { font-weight: 700; font-size: 13px; color: var(--accent-soft); }
+.gloss-def { font-size: 13px; color: var(--muted); }
+
+/* ---------- callout ---------- */
+.callout {
+  display: flex;
+  gap: 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 14px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.callout-icon { color: var(--accent-soft); font-size: 15px; flex-shrink: 0; }
+
+/* ---------- lang visibility ---------- */
+.lang-pl, .lang-en { }
+[data-lang="en"] .lang-pl { display: none; }
+[data-lang="pl"] .lang-en { display: none; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 700px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .content { padding: 20px 16px 60px; }
+  .ctrl-row { grid-template-columns: 1fr; }
+  .gloss-row { grid-template-columns: 1fr; gap: 2px; }
+}
+</style>
+</head>
+<body data-lang="pl">
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="logo">◆</div>
+    <div>
+      <div>phaselimiter</div>
+      <div class="subtitle lang-pl">dokumentacja</div>
+      <div class="subtitle lang-en">documentation</div>
+    </div>
+  </div>
+  <div class="lang-btns">
+    <button class="btn active" id="btnPL" onclick="setLang('pl')">PL</button>
+    <button class="btn"        id="btnEN" onclick="setLang('en')">EN</button>
+  </div>
+  <a href="/" class="btn">
+    <span class="lang-pl">&#8592; Aplikacja</span>
+    <span class="lang-en">&#8592; Back to app</span>
+  </a>
+</header>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <nav>
+      <div class="nav-section lang-pl">Nawigacja</div>
+      <div class="nav-section lang-en">Navigation</div>
+
+      <a class="nav-link" href="#quickstart">
+        <span class="lang-pl">Szybki start</span>
+        <span class="lang-en">Quick start</span>
+      </a>
+      <a class="nav-link" href="#controls">
+        <span class="lang-pl">Kontrolki</span>
+        <span class="lang-en">Controls</span>
+      </a>
+      <a class="nav-link" href="#ctrl-loudness" style="padding-left:22px;font-size:12px">
+        <span class="lang-pl">1. Glosnosc</span>
+        <span class="lang-en">1. Loudness</span>
+      </a>
+      <a class="nav-link" href="#ctrl-am5" style="padding-left:22px;font-size:12px">
+        <span class="lang-pl">2. AutoMastering5</span>
+        <span class="lang-en">2. AutoMastering5</span>
+      </a>
+      <a class="nav-link" href="#ctrl-precomp" style="padding-left:22px;font-size:12px">
+        <span class="lang-pl">3. Pre-kompresja</span>
+        <span class="lang-en">3. Pre-compression</span>
+      </a>
+      <a class="nav-link" href="#ctrl-limiter" style="padding-left:22px;font-size:12px">
+        <span class="lang-pl">4. Phase Limiter</span>
+        <span class="lang-en">4. Phase Limiter</span>
+      </a>
+      <a class="nav-link" href="#ctrl-ceiling" style="padding-left:22px;font-size:12px">
+        <span class="lang-pl">5. Sufit (Ceiling)</span>
+        <span class="lang-en">5. Ceiling</span>
+      </a>
+      <a class="nav-link" href="#ctrl-sections" style="padding-left:22px;font-size:12px">
+        <span class="lang-pl">6. Sekcje</span>
+        <span class="lang-en">6. Sections</span>
+      </a>
+      <a class="nav-link" href="#pipeline">
+        <span class="lang-pl">Jak to dziala</span>
+        <span class="lang-en">How it works</span>
+      </a>
+      <a class="nav-link" href="#glossary">
+        <span class="lang-pl">Slowniczek</span>
+        <span class="lang-en">Glossary</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- CONTENT -->
+  <main class="content">
+
+    <!-- TITLE -->
+    <h1>
+      <span class="lang-pl">Dokumentacja phaselimiter</span>
+      <span class="lang-en">phaselimiter documentation</span>
+    </h1>
+    <p class="lead lang-pl">
+      phaselimiter to narzedzie do masteringu audio oparte na silniku bakuage/phase_limiter
+      (fork filipszoldra). Przetwarza pliki audio uzywajac wielopasmowego mastera referencyjnego
+      i fazowego limitera opartego na optymalizacji FFT.
+    </p>
+    <p class="lead lang-en">
+      phaselimiter is an audio mastering tool built on the bakuage/phase_limiter engine
+      (filipszoldra fork). It processes audio using a reference-based multiband master
+      and a phase limiter driven by FFT optimization.
+    </p>
+
+    <!-- QUICK START -->
+    <h2 id="quickstart">
+      <span class="lang-pl">Szybki start</span>
+      <span class="lang-en">Quick start</span>
+    </h2>
+
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title lang-pl">Wgraj plik audio</div>
+          <div class="step-title lang-en">Upload an audio file</div>
+          <div class="step-desc lang-pl">Kliknij strzalke w gornym panelu lub przeciabnij plik na obszar aplikacji. Obslugiwane formaty: WAV, MP3, FLAC, AAC, M4A, OGG, AIFF.</div>
+          <div class="step-desc lang-en">Click the arrow in the top panel or drag a file onto the app. Supported formats: WAV, MP3, FLAC, AAC, M4A, OGG, AIFF.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title lang-pl">Analiza (opcjonalna, ale zalecana)</div>
+          <div class="step-title lang-en">Analysis (optional, but recommended)</div>
+          <div class="step-desc lang-pl">Kliknij "Analyze" aby uzyskac profil spektralny, LUFS, LRA i sugestie ustawien. Silnik automatycznie zaproponuje korekcje EQ per-pasmo na podstawie porownania z profilem referencyjnym.</div>
+          <div class="step-desc lang-en">Click "Analyze" to get a spectral profile, LUFS, LRA, and setting suggestions. The engine automatically proposes per-band EQ corrections based on comparison with the reference profile.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title lang-pl">Dostosuj ustawienia</div>
+          <div class="step-title lang-en">Adjust settings</div>
+          <div class="step-desc lang-pl">Ustawienia domyslne dzialaja dobrze dla wiekszosci nagrań. Jesli chcesz - dostosuj cel glosnosci (LUFS), intensywnosc masteringu i inne parametry.</div>
+          <div class="step-desc lang-en">Default settings work well for most tracks. Optionally adjust the loudness target (LUFS), mastering intensity, and other parameters.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title lang-pl">Uruchom mastering</div>
+          <div class="step-title lang-en">Run mastering</div>
+          <div class="step-desc lang-pl">Kliknij "Master". Postep pojawi sie w kolejce. Czas przetwarzania: typowo 3-8 minut dla nagrania 3-5 min (zalezy od ustawien jakosci).</div>
+          <div class="step-desc lang-en">Click "Master". Progress appears in the job queue. Processing time: typically 3-8 minutes for a 3-5 min track (depends on quality settings).</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title lang-pl">Pobierz wynik i porownaj</div>
+          <div class="step-title lang-en">Download result and compare</div>
+          <div class="step-desc lang-pl">Po zakonczeniu kliknij "Download". Panel "Input / Output comparison" pojawi sie automatycznie z porownaniem metryk, wykresow EQ, spektrogramow i odtwarzaczem A/B.</div>
+          <div class="step-desc lang-en">When done, click "Download". The "Input / Output comparison" panel appears automatically with metric comparison, EQ charts, spectrograms, and an A/B player.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="callout-icon">&#9432;</span>
+      <span class="lang-pl">Plik wyjsciowy jest przesylany do przegladarki w trakcie masteringu (przez to samo polaczenie SSE). Pobieranie nie wymaga osobnego polaczenia z serwerem i dziala nawet po zrestartowaniu instancji serwerowej.</span>
+      <span class="lang-en">The output file is transferred to the browser during mastering (over the same SSE connection). Download does not require a separate server connection and works even after a server instance restart.</span>
+    </div>
+
+    <!-- CONTROLS -->
+    <h2 id="controls">
+      <span class="lang-pl">Opis kontrolek</span>
+      <span class="lang-en">Controls reference</span>
+    </h2>
+
+    <!-- Step 1 -->
+    <div class="ctrl-section" id="ctrl-loudness">
+      <div class="ctrl-section-head">
+        <div class="step-badge">1</div>
+        <div class="ctrl-section-title lang-pl">Cel glosnosci (Loudness Target)</div>
+        <div class="ctrl-section-title lang-en">Loudness Target</div>
+      </div>
+      <div class="ctrl-section-body">
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Glosnosc<span class="ctrl-range">-20 .. 0 LUFS</span></div>
+            <div class="ctrl-name lang-en">Loudness<span class="ctrl-range">-20 .. 0 LUFS</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Docelowa glosnosc wyjsciowa w LUFS. Domyslnie: -14 LUFS (standard Spotify/YouTube). Wyzsza wartosc = glosniej = mocniejsze dzialanie limitera i wiecej przyduszenia dynamiki. Zalecane wartosci: -14 (streaming), -9 do -12 (radio/telewizja), -9 (agresywny mix).</div>
+            <div class="ctrl-desc lang-en">Target output loudness in LUFS. Default: -14 LUFS (Spotify/YouTube standard). Higher value = louder = harder limiting and more dynamic compression. Recommended: -14 (streaming), -9 to -12 (radio/TV), -9 (aggressive mix).</div>
+            <div class="ctrl-tip lang-pl">Wskazowka: zacznij od -14 LUFS. Jesli brzmienie jest zbyt skompresowane - obniz do -16 lub -18.</div>
+            <div class="ctrl-tip lang-en">Tip: start at -14 LUFS. If the result sounds over-compressed, lower to -16 or -18.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="ctrl-section" id="ctrl-am5">
+      <div class="ctrl-section-head">
+        <div class="step-badge">2</div>
+        <div class="ctrl-section-title lang-pl">AutoMastering5</div>
+        <div class="ctrl-section-title lang-en">AutoMastering5</div>
+      </div>
+      <div class="ctrl-section-body">
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Intensywnosc<span class="ctrl-range">0 .. 1</span></div>
+            <div class="ctrl-name lang-en">Intensity<span class="ctrl-range">0 .. 1</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Jak mocno silnik dopasowuje barwe i dynamike do wzorca referencyjnego. Domyslnie: 0.4. Niskie wartosci (0.1-0.3) = subtelna korekcja. Wysokie (0.6-0.8) = wyrazna zmiana tonalna.</div>
+            <div class="ctrl-desc lang-en">How strongly the engine matches tone and dynamics to the reference. Default: 0.4. Low values (0.1-0.3) = subtle correction. High (0.6-0.8) = strong tonal change.</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Dopasowanie stereo<span class="ctrl-range">0 .. 1</span></div>
+            <div class="ctrl-name lang-en">Stereo match<span class="ctrl-range">0 .. 1</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Dopasowanie szerokosci obrazu stereo do wzorca referencyjnego. 0 = bez zmian w stereo, 1 = pelne dopasowanie. Domyslnie: 1.0.</div>
+            <div class="ctrl-desc lang-en">Matches the stereo width to the reference profile. 0 = no stereo change, 1 = full match. Default: 1.0.</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Zachowaj basy</div>
+            <div class="ctrl-name lang-en">Preserve bass</div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Chroni niskie czestotliwosci przed nadmiernym przyduszeniem przez AutoMastering5. Zalecane wlaczone (domyslnie).</div>
+            <div class="ctrl-desc lang-en">Protects low frequencies from over-compression by AutoMastering5. Recommended: on (default).</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Tryb EQ</div>
+            <div class="ctrl-name lang-en">EQ Mode</div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">
+              <b>Ceiling + transform</b> (domyslny) - pelne dzialanie: ogranicza gorny puchar optymalizatora per-pasmo i realizuje korekcje tonalna.<br>
+              <b>Ceiling only</b> - tylko ograniczenie optimum, bez korekcji tonalnej. Mniej "pompowania" przy silnej korekcji.<br>
+              <b>Transform only</b> - tylko statyczna korekcja tonalna (przesunięcie barwy bez ingerencji w optimum).
+            </div>
+            <div class="ctrl-desc lang-en">
+              <b>Ceiling + transform</b> (default) - full effect: caps optimizer upper bound per band and applies tonal correction.<br>
+              <b>Ceiling only</b> - only limits the optimizer ceiling, no tonal correction. Less pumping with strong corrections.<br>
+              <b>Transform only</b> - only static tonal correction (color shift without touching the optimizer).
+            </div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Korekcja EQ per-pasmo</div>
+            <div class="ctrl-name lang-en">Per-band EQ correction</div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Reczna korekcja tonalna - przeciagnij punkty krzywej EQ w gore lub w dol. Wartosc 0 dB = neutralna. Zaznacz "Enable EQ correction" aby aktywowac. Dostepne po kliknieciu "Analyze" (sugestie sa wypelniane automatycznie).</div>
+            <div class="ctrl-desc lang-en">Manual tonal correction - drag EQ curve points up or down. 0 dB = neutral. Check "Enable EQ correction" to activate. Available after clicking "Analyze" (suggestions are filled in automatically).</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Tylko limiter</div>
+            <div class="ctrl-name lang-en">Limiter Only</div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Tryb diagnostyczny: omija AutoMastering5 i stosuje tylko phase limiter + normalizacje glosnosci. Przydatne do porownania "przed/po" AutoMastering5.</div>
+            <div class="ctrl-desc lang-en">Diagnostic mode: bypasses AutoMastering5 and applies only the phase limiter + loudness normalization. Useful for comparing with/without AutoMastering5.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="ctrl-section" id="ctrl-precomp">
+      <div class="ctrl-section-head">
+        <div class="step-badge">3</div>
+        <div class="ctrl-section-title lang-pl">Pre-kompresja</div>
+        <div class="ctrl-section-title lang-en">Pre-compression</div>
+      </div>
+      <div class="ctrl-section-body">
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Wlaczony/wylaczony</div>
+            <div class="ctrl-name lang-en">Enable/disable</div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Lagodna kompresja stosowana przed phase limiterem. Zmniejsza pompowanie i trzaski. Domyslnie: wlaczona.</div>
+            <div class="ctrl-desc lang-en">Gentle compression applied before the phase limiter. Reduces pumping and clicks. Default: on.</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Prog (offset)<span class="ctrl-range">0 .. +18 dB</span></div>
+            <div class="ctrl-name lang-en">Threshold offset<span class="ctrl-range">0 .. +18 dB</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Offset progu kompresji powyzej sredniej glosnosci wejscia. Domyslnie: +6 dB. Nizszy = kompresja wchodzi wczesniej i jest mocniejsza. Wyzszy = tylko szczyty sa kompresowane.</div>
+            <div class="ctrl-desc lang-en">Threshold offset above the input track's average loudness. Default: +6 dB. Lower = compression kicks in earlier and harder. Higher = only peaks are compressed.</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Okno czasowe<span class="ctrl-range">0.05 .. 1 s</span></div>
+            <div class="ctrl-name lang-en">Time window<span class="ctrl-range">0.05 .. 1 s</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Czas usredniania do obliczenia aktualnej glosnosci. Domyslnie: 0.2 s. Krotkie wartosci = szybka reakcja, wiecej artefaktow. Dlugie = plynna kompresja, mniej pompowania.</div>
+            <div class="ctrl-desc lang-en">Averaging window for current loudness calculation. Default: 0.2 s. Short = fast response, more artifacts. Long = smooth compression, less pumping.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="ctrl-section" id="ctrl-limiter">
+      <div class="ctrl-section-head">
+        <div class="step-badge">4</div>
+        <div class="ctrl-section-title">Phase Limiter</div>
+      </div>
+      <div class="ctrl-section-body">
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Nadprobkowanie<span class="ctrl-range">1x / 2x / 4x</span></div>
+            <div class="ctrl-name lang-en">Oversampling<span class="ctrl-range">1x / 2x / 4x</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Wyzsze nadprobkowanie zmniejsza aliasing i artefakty intermodulacji. 1x (domyslne) = najszybsze, najmniejsze zuzycie RAM. 4x = najczysciej, ale wymaga ~4x wiecej CPU i RAM.</div>
+            <div class="ctrl-desc lang-en">Higher oversampling reduces aliasing and intermodulation artifacts. 1x (default) = fastest, least RAM. 4x = cleanest, but requires ~4x more CPU and RAM.</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Jakosc (iteracje)<span class="ctrl-range">40 .. 400</span></div>
+            <div class="ctrl-name lang-en">Quality (iterations)<span class="ctrl-range">40 .. 400</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Liczba iteracji optymalizatora FFT. Domyslnie: 100. Wiecej iteracji = mniej artefaktow limitera, ale wolniejsze przetwarzanie. Wartosc 40-60 = szybki podglad. 200-400 = maksymalna jakosc, duzo wolniej.</div>
+            <div class="ctrl-desc lang-en">Number of FFT optimizer iterations. Default: 100. More iterations = fewer limiting artifacts, but slower processing. 40-60 = quick preview. 200-400 = maximum quality, much slower.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="ctrl-section" id="ctrl-ceiling">
+      <div class="ctrl-section-head">
+        <div class="step-badge">5</div>
+        <div class="ctrl-section-title lang-pl">Sufit (Ceiling)</div>
+        <div class="ctrl-section-title lang-en">Ceiling</div>
+      </div>
+      <div class="ctrl-section-body">
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">True-peak sufit<span class="ctrl-range">-3 .. 0 dBTP</span></div>
+            <div class="ctrl-name lang-en">True-peak ceiling<span class="ctrl-range">-3 .. 0 dBTP</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Maksymalny true-peak wyjscia. Domyslnie: -1.0 dBTP. Standard bezpieczny dla platform streamingowych (Spotify, YouTube, Apple Music). -1 dBTP zapobiega przekroczeniu 0 dBFS po kompresji MP3/AAC.</div>
+            <div class="ctrl-desc lang-en">Maximum true-peak of the output. Default: -1.0 dBTP. The safe standard for streaming platforms (Spotify, YouTube, Apple Music). -1 dBTP prevents 0 dBFS clipping after MP3/AAC encoding.</div>
+            <div class="ctrl-tip lang-pl">Wskazowka: pozostaw -1.0 dBTP dla streamingu. Dla masteringu na CD mozna ustawic -0.1 dBTP.</div>
+            <div class="ctrl-tip lang-en">Tip: keep -1.0 dBTP for streaming. For CD mastering you can use -0.1 dBTP.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="ctrl-section" id="ctrl-sections">
+      <div class="ctrl-section-head">
+        <div class="step-badge">6</div>
+        <div class="ctrl-section-title lang-pl">Mastering sekcyjny</div>
+        <div class="ctrl-section-title lang-en">Section-aware mastering</div>
+      </div>
+      <div class="ctrl-section-body">
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Sekcje wlaczone</div>
+            <div class="ctrl-name lang-en">Sections enabled</div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Pozwala oznaczac fragmenty nagrania (np. ciche intro, spokojny bridge) gdzie mastering ma dzialac lagodniej lub mocniej niz w reszcie utworu. Aktywne sekcje sa mieszane z sygnalem suchym zgodnie z intensywnoscia sekcji.</div>
+            <div class="ctrl-desc lang-en">Lets you mark segments of the recording (e.g. quiet intro, calm bridge) where mastering should be applied more gently or more strongly than the rest of the track. Active sections are blended with the dry signal according to section intensity.</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div>
+            <div class="ctrl-name lang-pl">Intensywnosc sekcji<span class="ctrl-range">0 .. 1</span></div>
+            <div class="ctrl-name lang-en">Section intensity<span class="ctrl-range">0 .. 1</span></div>
+          </div>
+          <div>
+            <div class="ctrl-desc lang-pl">Udzial przetworzonego sygnalu w zaznaczonych sekcjach. 0 = sekcja pozostaje zupelnie sucha (bez masteringu), 1 = pelny mastering. Domyslnie: 0.75.</div>
+            <div class="ctrl-desc lang-en">Wet signal share within marked sections. 0 = section stays completely dry (no mastering), 1 = full mastering. Default: 0.75.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <h2 id="pipeline">
+      <span class="lang-pl">Jak to dziala - pipeline</span>
+      <span class="lang-en">How it works - pipeline</span>
+    </h2>
+
+    <p class="lang-pl">Ponizej schemat przetwarzania sygnalu wewnatrz silnika <code>phase_limiter</code>. Kazdy etap jest wykonywany seryjnie na pelnym pliku audio.</p>
+    <p class="lang-en">Below is the signal processing pipeline inside the <code>phase_limiter</code> engine. Each stage processes the full audio file sequentially.</p>
+
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-connector"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+        <div class="pipe-card">
+          <div class="pipe-card-title lang-pl">Wejscie (dekodowanie)</div>
+          <div class="pipe-card-title lang-en">Input (decoding)</div>
+          <div class="pipe-card-desc lang-pl">ffmpeg dekoduje plik wejsciowy do PCM. Obslugiwane formaty: WAV, MP3, FLAC, AAC, M4A, OGG, AIFF i inne.</div>
+          <div class="pipe-card-desc lang-en">ffmpeg decodes the input file to PCM. Supported formats: WAV, MP3, FLAC, AAC, M4A, OGG, AIFF and others.</div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-connector"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+        <div class="pipe-card">
+          <div class="pipe-card-title">AutoMastering5</div>
+          <div class="pipe-card-desc lang-pl">Wielopasmowy korektor i kompresor mid/side. Optymalizacja rozniczkowa (differential evolution) dobiera parametry aby dopasowac brzmienie do profilu referencyjnego (mastering_reference.json). Kontroluje: intensywnosc, dopasowanie stereo, EQ per-pasmo.</div>
+          <div class="pipe-card-desc lang-en">Multiband equalizer and mid/side compressor. Differential evolution optimization selects parameters to match the sound to the reference profile (mastering_reference.json). Controls: intensity, stereo match, per-band EQ.</div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-connector"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+        <div class="pipe-card">
+          <div class="pipe-card-title lang-pl">Korekcja EQ (analityczna)</div>
+          <div class="pipe-card-title lang-en">Analytic EQ correction</div>
+          <div class="pipe-card-desc lang-pl">Statyczna korekcja per-pasmo wyliczona z analizy wejscia i porownania z profilem referencyjnym. Maksymalna korekcja: +/-6 dB, skalowana przez intensywnosc masteringu.</div>
+          <div class="pipe-card-desc lang-en">Static per-band correction calculated from input analysis compared to the reference profile. Maximum correction: +/-6 dB, scaled by mastering intensity.</div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-connector"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+        <div class="pipe-card">
+          <div class="pipe-card-title lang-pl">Pre-kompresja</div>
+          <div class="pipe-card-title lang-en">Pre-compression</div>
+          <div class="pipe-card-desc lang-pl">Opcjonalna lagodna kompresja z progiem powyzej sredniej glosnosci wejscia. Zmniejsza szczytowe wartosci przed fazowym limiterem, co redukuje artefakty limitowania.</div>
+          <div class="pipe-card-desc lang-en">Optional gentle compression with a threshold above the input's average loudness. Reduces peak levels before the phase limiter, which reduces limiting artifacts.</div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-connector"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+        <div class="pipe-card">
+          <div class="pipe-card-title lang-pl">Normalizacja do celu LUFS</div>
+          <div class="pipe-card-title lang-en">Normalization to target LUFS</div>
+          <div class="pipe-card-desc lang-pl">Liniowy gain dopasowuje glosnosc sygnalu do docelowego LUFS przed limiterem.</div>
+          <div class="pipe-card-desc lang-en">Linear gain adjusts the signal loudness to the target LUFS before the limiter.</div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-connector"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+        <div class="pipe-card">
+          <div class="pipe-card-title lang-pl">Phase Limiter (GradCalculator)</div>
+          <div class="pipe-card-title lang-en">Phase Limiter (GradCalculator)</div>
+          <div class="pipe-card-desc lang-pl">Glowny modul. Iteracyjna optymalizacja FFT minimalizuje naruszenia progu true-peak bez typowego "twardego przycięcia" (clipping). Kazda iteracja przesuwa fazy skladowych widma aby zmniejszyc szczyty przy zachowaniu brzmienia. Liczba iteracji: kontrolka Quality (40-400).</div>
+          <div class="pipe-card-desc lang-en">Main module. Iterative FFT optimization minimizes true-peak threshold violations without hard clipping. Each iteration shifts the phases of spectral components to reduce peaks while preserving sound quality. Iteration count: Quality control (40-400).</div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-connector"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+        <div class="pipe-card">
+          <div class="pipe-card-title lang-pl">Sufit true-peak</div>
+          <div class="pipe-card-title lang-en">True-peak ceiling</div>
+          <div class="pipe-card-desc lang-pl">Ostateczne przycięcie true-peak do ustawionego sufitu (domyslnie -1.0 dBTP). Gwarantuje, ze plik wyjsciowy nie przekroczy limitu nawet po ewentualnym kodowaniu stratnym.</div>
+          <div class="pipe-card-desc lang-en">Final true-peak clamp to the configured ceiling (default: -1.0 dBTP). Guarantees the output does not exceed the limit even after lossy encoding.</div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-connector"><div class="pipe-dot"></div></div>
+        <div class="pipe-card">
+          <div class="pipe-card-title lang-pl">Wyjscie (WAV)</div>
+          <div class="pipe-card-title lang-en">Output (WAV)</div>
+          <div class="pipe-card-desc lang-pl">Plik WAV 44.1 kHz, 16-bit lub 24-bit. Przesylany do przegladarki przez SSE i dostepny od razu po zakonczeniu masteringu.</div>
+          <div class="pipe-card-desc lang-en">WAV file at 44.1 kHz, 16-bit or 24-bit. Transferred to the browser via SSE and available immediately after mastering finishes.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GLOSSARY -->
+    <h2 id="glossary">
+      <span class="lang-pl">Slowniczek terminow</span>
+      <span class="lang-en">Glossary</span>
+    </h2>
+
+    <div class="glossary">
+      <div class="gloss-row">
+        <div class="gloss-term">LUFS</div>
+        <div class="gloss-def lang-pl">Loudness Units Full Scale - miara glosnosci postrzeganej (percepcyjnej), mierzona zgodnie z ITU-R BS.1770. -14 LUFS = standard Spotify i YouTube. Im wyzsza wartosc (blizej 0), tym glosniej.</div>
+        <div class="gloss-def lang-en">Loudness Units Full Scale - a perceptual loudness measure per ITU-R BS.1770. -14 LUFS = Spotify and YouTube standard. Higher values (closer to 0) = louder.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">LRA</div>
+        <div class="gloss-def lang-pl">Loudness Range - rozstep dynamiczny miedzy cichymi a glosnymi fragmentami, w jednostkach LU. Mala LRA (np. 3-5 LU) = mocno skompresowany, plaska dynamika. Duza LRA (np. 12+ LU) = naturalna dynamika, zmienna glosnosc.</div>
+        <div class="gloss-def lang-en">Loudness Range - dynamic spread between quiet and loud sections, in LU. Small LRA (e.g. 3-5 LU) = heavily compressed, flat dynamics. Large LRA (e.g. 12+ LU) = natural dynamics, varying loudness.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">True Peak</div>
+        <div class="gloss-def lang-pl">Szczytowa wartosc sygnalu po interpolacji analogowej (rekonstrukcji). Rozni sie od "sample peak" - mierzy rzeczywisty analog po konwersji D/A. Wazne dla platform streamingowych: MP3/AAC moga wzmacniac szczyty, dlatego mastering celuje w -1 dBTP, a nie 0 dBFS.</div>
+        <div class="gloss-def lang-en">Peak signal level after analog interpolation (reconstruction). Different from "sample peak" - measures the actual analog level after D/A conversion. Important for streaming: MP3/AAC encoding can boost peaks, so mastering targets -1 dBTP rather than 0 dBFS.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">Dynamics</div>
+        <div class="gloss-def lang-pl">Odchylenie standardowe krotkoterminowej glosnosci w dB. Wyzsze wartosci = bardziej dynamiczny dzwiek z wyraznymi zmianami glosnosci. Niskie wartosci = brzmienie mocno skompresowane, "glosne".</div>
+        <div class="gloss-def lang-en">Standard deviation of short-term loudness in dB. Higher values = more dynamic sound with noticeable loudness changes. Low values = heavily compressed, "loud" sound.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">AutoMastering5</div>
+        <div class="gloss-def lang-pl">Glowny modul masteringowy silnika. Wielopasmowy korektor i kompresor mid/side, ktorego parametry sa dobierane automatycznie przez optymalizacje rozniczkowa (differential evolution) aby dopasowac brzmienie do profilu referencyjnego.</div>
+        <div class="gloss-def lang-en">Main mastering module of the engine. A multiband equalizer and mid/side compressor whose parameters are automatically selected by differential evolution optimization to match the reference sound profile.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">Phase Limiter</div>
+        <div class="gloss-def lang-pl">Limiter oparty na iteracyjnej optymalizacji FFT. Zamiast "obcinac" szczyty (clipping), przesuwa fazy skladowych widmowych aby zredukowac amplitudy szczytowe przy minimalnym wplywie na brzmienie.</div>
+        <div class="gloss-def lang-en">A limiter based on iterative FFT optimization. Instead of hard-clipping peaks, it shifts the phases of spectral components to reduce peak amplitudes with minimal impact on sound quality.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">ERB</div>
+        <div class="gloss-def lang-pl">Equivalent Rectangular Bandwidth - psychoakustyczna skala pasm czestotliwosci odpowiadajaca percepcji ucha ludzkiego. Silnik przetwarza 9 pasm ERB zamiast liniowej skali Hz.</div>
+        <div class="gloss-def lang-en">Equivalent Rectangular Bandwidth - a psychoacoustic frequency band scale corresponding to human hearing perception. The engine processes 9 ERB bands rather than a linear Hz scale.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">Pre-compression</div>
+        <div class="gloss-def lang-pl">Etap lagodnej kompresji przed glownym limiterem. Redukuje naglee szczyty (transjenty) co pozwala limiterowi pracowac plynniej i z mniej slyszalnymi artefaktami ("pompowanie").</div>
+        <div class="gloss-def lang-en">A gentle compression stage before the main limiter. Reduces sudden peaks (transients), allowing the limiter to work more smoothly with fewer audible artifacts ("pumping").</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">EQ</div>
+        <div class="gloss-def lang-pl">Equalization - korekcja tonalna przez wzmacnianie lub tłumienie pasm czestotliwosci. W kontekscie tej aplikacji: korekcja per-pasmo ERB wynikajaca z analizy lub ustawiana recznie.</div>
+        <div class="gloss-def lang-en">Equalization - tonal correction by boosting or cutting frequency bands. In this app: per-ERB-band correction derived from analysis or set manually.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">Spectrogram</div>
+        <div class="gloss-def lang-pl">Wizualizacja tresci czestotliwosciowej w czasie: os X = czas (od lewej do prawej), os Y = czestotliwosc (nizej = basowe, wyzej = wysokie), jasnosc = energia. Widoczny w panelu analizy i porownania.</div>
+        <div class="gloss-def lang-en">A visualization of frequency content over time: X axis = time (left to right), Y axis = frequency (bottom = bass, top = highs), brightness = energy. Visible in the analysis and comparison panel.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">dBTP</div>
+        <div class="gloss-def lang-pl">decibel True Peak - jednostka pomiaru true-peak. -1 dBTP oznacza ze true-peak jest 1 dB ponizej pelnej skali (0 dBFS). Rozni sie od dBFS (sample peak) dla nagrań po kodowaniu stratnym.</div>
+        <div class="gloss-def lang-en">decibel True Peak - unit for measuring true-peak level. -1 dBTP means the true-peak is 1 dB below full scale (0 dBFS). Differs from dBFS (sample peak) for recordings after lossy encoding.</div>
+      </div>
+      <div class="gloss-row">
+        <div class="gloss-term">SSE</div>
+        <div class="gloss-def lang-pl">Server-Sent Events - protokol HTTP do jednokierunkowego strumieniowania danych z serwera do przegladarki. Uzywany do przesylania postepu masteringu i pliku wyjsciowego w czasie rzeczywistym.</div>
+        <div class="gloss-def lang-en">Server-Sent Events - an HTTP protocol for one-way server-to-browser data streaming. Used to transmit mastering progress and the output file in real time.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:40px;font-size:12px;color:var(--muted)">
+      <span class="lang-pl">Silnik: bakuage/phase_limiter (fork filipszoldra). GUI: phaselimiter-gui. Kontakt: filipszoldra@gmail.com.</span>
+      <span class="lang-en">Engine: bakuage/phase_limiter (filipszoldra fork). GUI: phaselimiter-gui. Contact: filipszoldra@gmail.com.</span>
+    </p>
+
+  </main>
+</div>
+
+<script>
+function setLang(lang) {
+  document.body.dataset.lang = lang;
+  document.getElementById('btnPL').classList.toggle('active', lang === 'pl');
+  document.getElementById('btnEN').classList.toggle('active', lang === 'en');
+  localStorage.setItem('pl-docs-lang', lang);
+}
+
+(function() {
+  const saved = localStorage.getItem('pl-docs-lang');
+  const detected = navigator.language && navigator.language.startsWith('pl') ? 'pl' : 'en';
+  setLang(saved || detected);
+
+  // Highlight active nav link on scroll
+  const links = document.querySelectorAll('.nav-link[href^="#"]');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const id = e.target.id;
+        links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + id));
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  document.querySelectorAll('h2[id], h3[id]').forEach(el => observer.observe(el));
+})();
+</script>
+</body>
+</html>

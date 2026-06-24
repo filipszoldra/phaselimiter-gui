@@ -1993,6 +1993,8 @@ async function init() {
   if (IS_SERVER) {
     const outRow = el("outputDir").closest(".field-row");
     if (outRow) outRow.style.display = "none";
+    const docsLink = document.getElementById("docsLink");
+    if (docsLink) docsLink.style.display = "";
   } else {
     el("outputDir").value = (await bridge.defaultOutputDir()) || "";
   }
