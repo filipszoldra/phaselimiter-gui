@@ -500,7 +500,7 @@ function renderJobCompareEQ(container, inR, outR) {
   const allDb = allBands.map(b => b.loudness).filter(v => v != null);
   const yMin = Math.floor((Math.min(...allDb) - 3) / 5) * 5;
   const yMax = allDb.length ? Math.min(-4, Math.ceil((Math.max(...allDb) + 3) / 5) * 5) : -4;
-  const W = 320, H = 110, PL = 32, PR = 6, PT = 8, PB = 22;
+  const W = 320, H = 110, PL = 32, PR = 20, PT = 8, PB = 22;
   const CW = W - PL - PR, CH = H - PT - PB;
   const xOf = i => PL + (i / 8) * CW;
   const yOf = db => PT + CH * (1 - (db - yMin) / (yMax - yMin));
@@ -568,7 +568,7 @@ function renderJobCompareLoudness(container, inR, outR) {
   const allDb  = [...(inS||[]), ...(outS||[])].map(p => p.db).filter(v => v != null);
   const yMin = Math.max(-60, Math.floor((Math.min(...allDb) - 2) / 5) * 5);
   const yMax = Math.ceil((Math.max(...allDb) + 2) / 5) * 5;
-  const W = 320, H = 80, PL = 30, PR = 6, PT = 6, PB = 18;
+  const W = 320, H = 80, PL = 30, PR = 20, PT = 6, PB = 18;
   const CW = W - PL - PR, CH = H - PT - PB;
   const xOf = sec => PL + (sec / allSec) * CW;
   const yOf = db  => PT + CH * (1 - (db - yMin) / (yMax - yMin));
