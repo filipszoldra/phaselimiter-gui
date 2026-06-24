@@ -486,22 +486,27 @@ func handleMaster(an *Analyzer, runner *MasteringRunner, execDir, ffmpeg string,
 						deleteTokenEntry(outTok)
 						os.Remove(inPath)
 					} else {
-						// Run input analysis concurrently with file streaming so both finish together.
-						analysisCh := make(chan *AnalysisResult, 1)
-						go func() {
-							r, err := an.AnalyzeAudioFull(inPath)
+						// Analyze both input and output concurrently with file streaming.
+						type arResult struct{ r *AnalysisResult }
+						inputCh := make(chan arResult, 1)
+						outputCh := make(chan arResult, 1)
+						analyzeFile := func(path string, ch chan arResult) {
+							r, err := an.AnalyzeAudioFull(path)
 							if err != nil {
-								log.Printf("input analyze error job=%d: %v", jobID, err)
-								analysisCh <- nil
+								log.Printf("analyze error job=%d path=%s: %v", jobID, path, err)
+								ch <- arResult{nil}
 								return
 							}
-							r.SpectrogramURL = "" // local PNG path, not accessible cross-instance
-							analysisCh <- r
-						}()
+							r.SpectrogramURL = "" // local PNG, not accessible cross-instance
+							ch <- arResult{r}
+						}
+						go analyzeFile(inPath, inputCh)
+						go analyzeFile(outPath, outputCh)
 						streamFileSSE(w, flusher, jobID, outPath)
-						// Always send input-analysis (even nil) so the client never waits for a 60s timeout.
-						ar := <-analysisCh
-						b, _ := json.Marshal(map[string]any{"type": "input-analysis", "id": jobID, "inputAnalysis": ar})
+						// Wait for both analyses, then send combined event so client never waits.
+						inAr := (<-inputCh).r
+						outAr := (<-outputCh).r
+						b, _ := json.Marshal(map[string]any{"type": "input-analysis", "id": jobID, "inputAnalysis": inAr, "outputAnalysis": outAr})
 						fmt.Fprintf(w, "data: %s\n\n", b)
 						flusher.Flush()
 					}

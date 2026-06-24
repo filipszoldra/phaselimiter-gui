@@ -281,34 +281,17 @@ async function fetchJobResult(j, node) {
   loadBar.innerHTML = '<div class="bar-indeterminate" style="margin:4px 0 0"></div>';
   node.appendChild(loadBar);
   try {
-    let inAnalyzePromise, outAnalyzePromise;
+    let inResult = null, outResult = null;
     let meta = null;
     if (IS_SERVER) {
       meta = _serverJobMeta.get(j.id);
       if (!meta || !meta.outputToken) { loadBar.remove(); return; }
-      inAnalyzePromise = meta.inputAnalysisPromise || Promise.resolve(null);
-      outAnalyzePromise = fetch("/api/analyze-by-token/" + meta.outputToken)
-        .then(r => r.ok ? r.json() : null).catch(() => null)
-        .then(async result => {
-          if (result) return result;
-          // Token lookup failed (wrong instance after deploy). Wait for the inline SSE blob
-          // then re-upload it for analysis — gives us spectrograms + per-band data anyway.
-          for (let i = 0; i < 90 && !_jobBlobUrls.has(j.id); i++) {
-            await new Promise(r => setTimeout(r, 1000));
-          }
-          const blobUrl = _jobBlobUrls.get(j.id);
-          if (!blobUrl) return null;
-          try {
-            const r = await fetch(blobUrl);
-            const blob = await r.blob();
-            return await bridge.analyzeFull(new File([blob], "output.wav"));
-          } catch { return null; }
-        });
+      const analyses = await (meta.analysesPromise || Promise.resolve({ input: null, output: null }));
+      inResult = analyses.input;
+      outResult = analyses.output;
     } else {
-      inAnalyzePromise = bridge.analyzeFull(j.input);
-      outAnalyzePromise = bridge.analyzeFull(j.output);
+      [inResult, outResult] = await Promise.all([bridge.analyzeFull(j.input), bridge.analyzeFull(j.output)]);
     }
-    const [inResult, outResult] = await Promise.all([inAnalyzePromise, outAnalyzePromise]);
     loadBar.remove();
     if (!inResult && !outResult) return;
     const panel = document.createElement("div");
@@ -936,10 +919,12 @@ async function _streamOneMasterJob(file, settings) {
               continue; // wait for input-analysis SSE event before closing
             }
 
-            // Input-analysis: server finished analyzing the original file inline.
+            // Input-analysis: server finished analyzing input + output inline.
             if (jv.type === "input-analysis") {
               const meta = _serverJobMeta.get(lastId);
-              if (meta?.resolveInputAnalysis) meta.resolveInputAnalysis(jv.inputAnalysis || null);
+              if (meta?.resolveAnalyses) {
+                meta.resolveAnalyses({ input: jv.inputAnalysis || null, output: jv.outputAnalysis || null });
+              }
               return; // end of SSE stream
             }
 
@@ -947,12 +932,12 @@ async function _streamOneMasterJob(file, settings) {
             // Set metadata BEFORE plOnJobUpdate so fetchJobResult can read it synchronously.
             if (jv.status === "succeeded") {
               const tok = jv.output ? jv.output.replace("/api/download/", "") : null;
-              let resolveInputAnalysis;
-              const inputAnalysisPromise = new Promise(resolve => {
-                resolveInputAnalysis = resolve;
-                setTimeout(() => resolve(null), 10000);
+              let resolveAnalyses;
+              const analysesPromise = new Promise(resolve => {
+                resolveAnalyses = resolve;
+                setTimeout(() => resolve({ input: null, output: null }), 300000); // 5-min safety net
               });
-              _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok, inputAnalysisPromise, resolveInputAnalysis });
+              _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok, analysesPromise, resolveAnalyses });
             }
             window.plOnJobUpdate(jv);
             // Do NOT return after succeeded — wait for file-done (file data streams next).
@@ -961,16 +946,15 @@ async function _streamOneMasterJob(file, settings) {
         }
       }
     }
-  // Stream ended without explicit input-analysis handler — resolve with null so
-  // fetchJobResult is not held up by the 10-second timeout.
+  // Stream ended without explicit input-analysis — resolve so fetchJobResult is not held up.
   if (lastId !== null) {
     const meta = _serverJobMeta.get(lastId);
-    if (meta?.resolveInputAnalysis) meta.resolveInputAnalysis(null);
+    if (meta?.resolveAnalyses) meta.resolveAnalyses({ input: null, output: null });
   }
   } catch (err) {
     if (lastId !== null) {
       const meta = _serverJobMeta.get(lastId);
-      if (meta?.resolveInputAnalysis) meta.resolveInputAnalysis(null);
+      if (meta?.resolveAnalyses) meta.resolveAnalyses({ input: null, output: null });
       window.plOnJobUpdate({ id: lastId, status: "failed", progress: 0, message: String(err) });
     }
     throw err;
