@@ -499,11 +499,11 @@ func handleMaster(an *Analyzer, runner *MasteringRunner, execDir, ffmpeg string,
 							analysisCh <- r
 						}()
 						streamFileSSE(w, flusher, jobID, outPath)
-						if ar := <-analysisCh; ar != nil {
-							b, _ := json.Marshal(map[string]any{"type": "input-analysis", "id": jobID, "inputAnalysis": ar})
-							fmt.Fprintf(w, "data: %s\n\n", b)
-							flusher.Flush()
-						}
+						// Always send input-analysis (even nil) so the client never waits for a 60s timeout.
+						ar := <-analysisCh
+						b, _ := json.Marshal(map[string]any{"type": "input-analysis", "id": jobID, "inputAnalysis": ar})
+						fmt.Fprintf(w, "data: %s\n\n", b)
+						flusher.Flush()
 					}
 					return
 				}

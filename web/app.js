@@ -950,7 +950,7 @@ async function _streamOneMasterJob(file, settings) {
               let resolveInputAnalysis;
               const inputAnalysisPromise = new Promise(resolve => {
                 resolveInputAnalysis = resolve;
-                setTimeout(() => resolve(null), 60000);
+                setTimeout(() => resolve(null), 10000);
               });
               _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok, inputAnalysisPromise, resolveInputAnalysis });
             }
@@ -961,6 +961,12 @@ async function _streamOneMasterJob(file, settings) {
         }
       }
     }
+  // Stream ended without explicit input-analysis handler — resolve with null so
+  // fetchJobResult is not held up by the 10-second timeout.
+  if (lastId !== null) {
+    const meta = _serverJobMeta.get(lastId);
+    if (meta?.resolveInputAnalysis) meta.resolveInputAnalysis(null);
+  }
   } catch (err) {
     if (lastId !== null) {
       const meta = _serverJobMeta.get(lastId);
