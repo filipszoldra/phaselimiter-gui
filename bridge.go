@@ -102,7 +102,6 @@ func (app *App) startMastering(req StartReq) ([]JobView, error) {
 		m.Loudness = s.Loudness
 		m.Level = s.Level
 		m.BassPreservation = s.BassPreservation
-		m.LimiterOnly = s.LimiterOnly
 		m.Ceiling = s.Ceiling
 		m.LimiterOversample = s.LimiterOversample
 		if m.LimiterOversample < 1 {

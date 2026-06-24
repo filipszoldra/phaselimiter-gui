@@ -29,7 +29,6 @@ type JobSettings struct {
 	Loudness                float64    `json:"loudness"`
 	Level                   float64    `json:"level"`
 	BassPreservation        bool       `json:"bassPreservation"`
-	LimiterOnly             bool       `json:"limiterOnly"`
 	Ceiling                 float64    `json:"ceiling"`
 	LimiterOversample       int        `json:"limiterOversample"`
 	LimiterMaxIter          int        `json:"limiterMaxIter"`
