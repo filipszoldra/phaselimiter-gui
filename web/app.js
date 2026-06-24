@@ -595,12 +595,14 @@ function renderJobCompareLoudness(container, inR, outR) {
     t.setAttribute("class", "ab-scale"); t.textContent = db;
     svg.appendChild(t);
   });
+  const fmtMin = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const drawSeries = (series, cls) => {
     if (!series?.length) return;
-    let end = series.length;
+    let start = 0, end = series.length;
     while (end > 0 && series[end - 1].db <= yMin) end--;
-    if (!end) return;
-    const pts = series.slice(0, end).map(p => `${xOf(p.sec).toFixed(1)},${yOf(p.db).toFixed(1)}`).join(" ");
+    while (start < end && series[start].db <= yMin) start++;
+    if (start >= end) return;
+    const pts = series.slice(start, end).map(p => `${xOf(p.sec).toFixed(1)},${yOf(p.db).toFixed(1)}`).join(" ");
     const pl = document.createElementNS(ns, "polyline");
     pl.setAttribute("points", pts); pl.setAttribute("class", cls);
     pl.setAttribute("clip-path", `url(#${clipId})`);
@@ -608,27 +610,20 @@ function renderJobCompareLoudness(container, inR, outR) {
   };
   drawSeries(inS,  "jr-loud-in");
   drawSeries(outS, "jr-loud-out");
-  // Legend in top-right corner
-  [{ label: "Output", cls: "jr-loud-out", xEnd: W - PR }, { label: "Input", cls: "jr-loud-in", xEnd: W - PR - 46 }].forEach(({ label, cls, xEnd }) => {
-    const ln = document.createElementNS(ns, "line");
-    ln.setAttribute("x1", xEnd - 12); ln.setAttribute("x2", xEnd);
-    ln.setAttribute("y1", PT + 4); ln.setAttribute("y2", PT + 4);
-    ln.setAttribute("class", cls); svg.appendChild(ln);
-    const t = document.createElementNS(ns, "text");
-    t.setAttribute("x", xEnd - 14); t.setAttribute("y", PT + 7);
-    t.setAttribute("class", "ab-scale"); t.setAttribute("text-anchor", "end");
-    t.textContent = label; svg.appendChild(t);
-  });
   [0, Math.round(allSec / 2), allSec].forEach(sec => {
     const x = xOf(sec);
     const t = document.createElementNS(ns, "text");
     t.setAttribute("x", x); t.setAttribute("y", H - 3);
     t.setAttribute("class", "ab-band-label");
     t.setAttribute("text-anchor", sec === 0 ? "start" : sec === allSec ? "end" : "middle");
-    t.textContent = fmtSec(sec);
+    t.textContent = fmtMin(sec);
     svg.appendChild(t);
   });
   container.appendChild(svg);
+  const leg = document.createElement("div");
+  leg.style.cssText = "display:flex;gap:10px;justify-content:flex-end;font-size:10px;margin-top:2px;";
+  leg.innerHTML = `<span style="color:var(--accent)">&#9135; Output</span><span style="color:#e05555;opacity:0.8">&#9135; Input</span>`;
+  container.appendChild(leg);
 }
 
 function updateOverallProgress() {
