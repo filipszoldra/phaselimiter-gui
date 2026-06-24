@@ -299,7 +299,7 @@ async function fetchJobResult(j, node) {
     panel.innerHTML = renderJobResultHTML(inResult, outResult);
     node.appendChild(panel);
     if (IS_SERVER && meta?.inputFile) {
-      renderABPlayer(panel, meta.inputFile, _jobBlobUrls.get(j.id) || j.output, inResult, outResult);
+      renderABPlayer(panel, meta.inputFile, () => _jobBlobUrls.get(j.id) || j.output, inResult, outResult);
     }
     renderJobCompareEQ(panel.querySelector(".jr-eq-canvas"), inResult, outResult);
     renderJobCompareLoudness(panel.querySelector(".jr-loud-canvas"), inResult, outResult);
@@ -325,7 +325,8 @@ function renderABPlayer(panel, inFile, outUrl, inResult, outResult) {
   const canNorm = inLufs != null && outLufs != null;
 
   let inSrc  = inFile instanceof File ? URL.createObjectURL(inFile) : String(inFile);
-  const outSrc = String(outUrl);
+  const getOutSrc = typeof outUrl === "function" ? outUrl : () => String(outUrl);
+  let outSrc = getOutSrc();
 
   const normLabel = canNorm
     ? `Match output loudness to input (${inLufs.toFixed(1)} LUFS)`
@@ -381,6 +382,7 @@ function renderABPlayer(panel, inFile, outUrl, inResult, outResult) {
     const wasPlaying = !audio.paused;
     audio.pause();
     currentWhich = which;
+    if (which === "out") outSrc = getOutSrc();
     audio.src = which === "in" ? inSrc : outSrc;
     audio.load();
     applyGain();
@@ -411,7 +413,6 @@ function renderABPlayer(panel, inFile, outUrl, inResult, outResult) {
   audio.addEventListener("pause", () => { playBtn.textContent = "▶"; });
   audio.addEventListener("ended", () => {
     playBtn.textContent = "▶"; seekEl.value = 0;
-    if (currentWhich === "out" && inSrc.startsWith("blob:")) { URL.revokeObjectURL(inSrc); inSrc = ""; }
   });
 
   const fmtT = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -565,7 +566,7 @@ function renderJobCompareLoudness(container, inR, outR) {
   if (!inS?.length && !outS?.length) { container.innerHTML = '<p class="muted" style="font-size:11px">No loudness data</p>'; return; }
   const allSec = Math.max(inR?.totalSec || 0, outR?.totalSec || 0) || 210;
   const allDb  = [...(inS||[]), ...(outS||[])].map(p => p.db).filter(v => v != null);
-  const yMin = Math.floor((Math.min(...allDb) - 2) / 5) * 5;
+  const yMin = Math.max(-60, Math.floor((Math.min(...allDb) - 2) / 5) * 5);
   const yMax = Math.ceil((Math.max(...allDb) + 2) / 5) * 5;
   const W = 320, H = 80, PL = 30, PR = 6, PT = 6, PB = 18;
   const CW = W - PL - PR, CH = H - PT - PB;
@@ -575,6 +576,14 @@ function renderJobCompareLoudness(container, inR, outR) {
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.classList.add("ab-svg");
+  const clipId = "lcl-" + Math.random().toString(36).slice(2);
+  const defs = document.createElementNS(ns, "defs");
+  const clip = document.createElementNS(ns, "clipPath");
+  clip.setAttribute("id", clipId);
+  const cr = document.createElementNS(ns, "rect");
+  cr.setAttribute("x", String(PL)); cr.setAttribute("y", String(PT));
+  cr.setAttribute("width", String(CW)); cr.setAttribute("height", String(CH));
+  clip.appendChild(cr); defs.appendChild(clip); svg.appendChild(defs);
   [yMin, Math.round((yMin + yMax) / 2), yMax].forEach(db => {
     const y = yOf(db);
     const ln = document.createElementNS(ns, "line");
@@ -591,6 +600,7 @@ function renderJobCompareLoudness(container, inR, outR) {
     const pts = series.map(p => `${xOf(p.sec).toFixed(1)},${yOf(p.db).toFixed(1)}`).join(" ");
     const pl = document.createElementNS(ns, "polyline");
     pl.setAttribute("points", pts); pl.setAttribute("class", cls);
+    pl.setAttribute("clip-path", `url(#${clipId})`);
     svg.appendChild(pl);
   };
   drawSeries(inS,  "jr-loud-in");
