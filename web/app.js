@@ -925,7 +925,7 @@ async function _streamOneMasterJob(file, settings) {
               if (meta?.resolveAnalyses) {
                 meta.resolveAnalyses({ input: jv.inputAnalysis || null, output: jv.outputAnalysis || null });
               }
-              return; // end of SSE stream
+              continue; // keep reading — file-chunk/file-done events follow
             }
 
             lastId = jv.id;

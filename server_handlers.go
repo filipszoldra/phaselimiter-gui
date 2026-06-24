@@ -502,13 +502,15 @@ func handleMaster(an *Analyzer, runner *MasteringRunner, execDir, ffmpeg string,
 						}
 						go analyzeFile(inPath, inputCh)
 						go analyzeFile(outPath, outputCh)
-						streamFileSSE(w, flusher, jobID, outPath)
-						// Wait for both analyses, then send combined event so client never waits.
+						// Wait for both analyses FIRST, then send the event so the panel
+						// appears before file streaming starts (Cloudflare ~30s subrequest limit
+						// may cut the long file-chunk sequence, but the panel is already shown).
 						inAr := (<-inputCh).r
 						outAr := (<-outputCh).r
 						b, _ := json.Marshal(map[string]any{"type": "input-analysis", "id": jobID, "inputAnalysis": inAr, "outputAnalysis": outAr})
 						fmt.Fprintf(w, "data: %s\n\n", b)
 						flusher.Flush()
+						streamFileSSE(w, flusher, jobID, outPath)
 					}
 					return
 				}
