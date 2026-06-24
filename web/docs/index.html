@@ -454,10 +454,10 @@ ul, ol { padding-left: 20px; margin-bottom: 12px; }
       <div class="step-item">
         <div class="step-num">2</div>
         <div class="step-body">
-          <div class="step-title lang-pl">Analiza (opcjonalna, ale zalecana)</div>
-          <div class="step-title lang-en">Analysis (optional, but recommended)</div>
-          <div class="step-desc lang-pl">Kliknij "Analyze" aby uzyskac profil spektralny, LUFS, LRA i sugestie ustawien. Silnik automatycznie zaproponuje korekcje EQ per-pasmo na podstawie porownania z profilem referencyjnym.</div>
-          <div class="step-desc lang-en">Click "Analyze" to get a spectral profile, LUFS, LRA, and setting suggestions. The engine automatically proposes per-band EQ corrections based on comparison with the reference profile.</div>
+          <div class="step-title lang-pl">Analiza uruchamia sie automatycznie</div>
+          <div class="step-title lang-en">Analysis runs automatically</div>
+          <div class="step-desc lang-pl">Po dodaniu pliku analiza startuje sama - wyniki (profil spektralny, LUFS, LRA) pojawiaja sie w panelu Analysis. Silnik zaproponuje korekcje EQ per-pasmo na podstawie porownania z profilem referencyjnym. Mozesz je zaakceptowac lub dostosowac.</div>
+          <div class="step-desc lang-en">After adding a file, analysis starts automatically - results (spectral profile, LUFS, LRA) appear in the Analysis panel. The engine proposes per-band EQ corrections based on comparison with the reference profile. You can accept or adjust them.</div>
         </div>
       </div>
       <div class="step-item">
@@ -564,30 +564,30 @@ ul, ol { padding-left: 20px; margin-bottom: 12px; }
         </div>
         <div class="ctrl-row">
           <div>
-            <div class="ctrl-name lang-pl">Tryb EQ</div>
-            <div class="ctrl-name lang-en">EQ Mode</div>
+            <div class="ctrl-name lang-pl">EQ correction (korekcja analityczna)</div>
+            <div class="ctrl-name lang-en">EQ correction (analysis-based)</div>
           </div>
           <div>
-            <div class="ctrl-desc lang-pl">
-              <b>Ceiling + transform</b> (domyslny) - pelne dzialanie: ogranicza gorny puchar optymalizatora per-pasmo i realizuje korekcje tonalna.<br>
-              <b>Ceiling only</b> - tylko ograniczenie optimum, bez korekcji tonalnej. Mniej "pompowania" przy silnej korekcji.<br>
-              <b>Transform only</b> - tylko statyczna korekcja tonalna (przesunięcie barwy bez ingerencji w optimum).
-            </div>
-            <div class="ctrl-desc lang-en">
-              <b>Ceiling + transform</b> (default) - full effect: caps optimizer upper bound per band and applies tonal correction.<br>
-              <b>Ceiling only</b> - only limits the optimizer ceiling, no tonal correction. Less pumping with strong corrections.<br>
-              <b>Transform only</b> - only static tonal correction (color shift without touching the optimizer).
-            </div>
+            <div class="ctrl-desc lang-pl">Zaznacz "Enable EQ correction" aby aktywowac korekcje EQ wynikajaca z analizy. Rozowa krzywa pokazuje sugerowane korekty per-pasmo (w dB). Mozesz ja recznie zmodyfikowac - przeciagnij punkty krzywej w gore lub w dol (do +/-12 dB). Silnik skaluje korekty przez intensywnosc i ogranicza do +/-6 dB.</div>
+            <div class="ctrl-desc lang-en">Check "Enable EQ correction" to activate analysis-derived EQ correction. The pink curve shows suggested per-band corrections (in dB). You can adjust it manually - drag the curve points up or down (up to +/-12 dB). The engine scales corrections by intensity, capped at +/-6 dB.</div>
           </div>
         </div>
         <div class="ctrl-row">
           <div>
-            <div class="ctrl-name lang-pl">Korekcja EQ per-pasmo</div>
-            <div class="ctrl-name lang-en">Per-band EQ correction</div>
+            <div class="ctrl-name lang-pl">Per-band EQ (Advanced optimizer)</div>
+            <div class="ctrl-name lang-en">Per-band EQ (Advanced optimizer)</div>
           </div>
           <div>
-            <div class="ctrl-desc lang-pl">Reczna korekcja tonalna - przeciagnij punkty krzywej EQ w gore lub w dol. Wartosc 0 dB = neutralna. Zaznacz "Enable EQ correction" aby aktywowac. Dostepne po kliknieciu "Analyze" (sugestie sa wypelniane automatycznie).</div>
-            <div class="ctrl-desc lang-en">Manual tonal correction - drag EQ curve points up or down. 0 dB = neutral. Check "Enable EQ correction" to activate. Available after clicking "Analyze" (suggestions are filled in automatically).</div>
+            <div class="ctrl-desc lang-pl">Zaawansowana sekcja "Advanced: per-band optimizer". Przeciagnij punkty (skala 0-2, 1 = neutralny) aby ograniczyc lub wzmocnic dzialanie AutoMastering5 per-pasmo. Tryb dzialania ("Parameter affects") decyduje co skaluja te mnozniki:<br>
+              <b>Ceiling + transform</b> (domyslny) - oba efekty: puchar optimum i korekcja tonalna.<br>
+              <b>Ceiling only</b> - tylko ograniczenie optimum. Mniej "pompowania".<br>
+              <b>Transform only</b> - tylko korekcja tonalna (barwa).
+            </div>
+            <div class="ctrl-desc lang-en">Advanced "per-band optimizer" section. Drag dots (scale 0-2, 1 = neutral) to restrict or boost AutoMastering5 per band. The "Parameter affects" mode controls what these multipliers scale:<br>
+              <b>Ceiling + transform</b> (default) - both effects: optimizer ceiling and tonal correction.<br>
+              <b>Ceiling only</b> - only caps the optimizer. Less pumping.<br>
+              <b>Transform only</b> - only tonal correction (color).
+            </div>
           </div>
         </div>
         <div class="ctrl-row">
