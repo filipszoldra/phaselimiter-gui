@@ -290,18 +290,35 @@ func handleDebug(execDir string) http.HandlerFunc {
 	}
 }
 
+// appVersion is a build-time cache-buster derived from the executable mtime.
+// Every new deploy produces a new binary with a fresh mtime, so browsers and
+// Cloudflare re-fetch app.js / app.css instead of serving a 4-hour-old copy.
+var appVersion = func() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "0"
+	}
+	info, err := os.Stat(exe)
+	if err != nil {
+		return "0"
+	}
+	return fmt.Sprintf("%d", info.ModTime().Unix())
+}()
+
 func serveIndexWithServerMode(w http.ResponseWriter, r *http.Request, webSub fs.FS) {
 	data, err := fs.ReadFile(webSub, "index.html")
 	if err != nil {
 		http.Error(w, "index.html not found", http.StatusInternalServerError)
 		return
 	}
-	injected := strings.Replace(string(data),
-		"</head>",
-		"<script>window.__webServerMode=true;</script></head>",
-		1,
-	)
+	html := string(data)
+	// Inject server-mode flag and cache-bust static assets by appending ?v=<mtime>.
+	html = strings.Replace(html, "</head>",
+		"<script>window.__webServerMode=true;</script></head>", 1)
+	html = strings.ReplaceAll(html, `"app.js"`, fmt.Sprintf(`"app.js?v=%s"`, appVersion))
+	html = strings.ReplaceAll(html, `"app.css"`, fmt.Sprintf(`"app.css?v=%s"`, appVersion))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(injected))
+	w.Write([]byte(html))
 }
