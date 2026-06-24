@@ -140,8 +140,8 @@ jobs:
             --min-instances 1 \
             --max-instances 1 \
             --concurrency 1 \
-            --memory 4Gi \
-            --cpu 2 \
+            --memory 8Gi \
+            --cpu 4 \
             --timeout 3600 \
             --execution-environment gen2 \
             --quiet
