@@ -120,7 +120,6 @@ function collectSettings() {
     loudness: num("loudness"),
     level: num("intensity"),
     bassPreservation: chk("preserveBass"),
-    limiterOnly: chk("limiterOnly"),
     ceiling: num("ceiling"),
     limiterOversample: Math.round(parseFloat(el("oversample").value)),
     limiterMaxIter: Math.round(num("quality")),

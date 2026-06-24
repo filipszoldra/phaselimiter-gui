@@ -32,7 +32,6 @@ type Mastering struct {
 	Loudness           float64
 	Level              float64 // AutoMastering5 reference-matching strength (mastering5_mastering_level)
 	BassPreservation   bool
-	LimiterOnly        bool // diagnostic: bypass AutoMastering5, run the limiter only
 	// Advanced (glitch-reduction) controls.
 	Ceiling                 float64
 	LimiterOversample       int
@@ -96,16 +95,7 @@ func (m Mastering) buildEngineArgs(inputPath, outputPath string, level float64) 
 	}
 
 	cleanup := func() {}
-	if m.LimiterOnly {
-		// --mastering false triggers AutoMastering classic which requires a resource
-		// file unavailable on Linux. Use mastering5 with zero intensity instead -
-		// same audible result (limiter + loudness normalization only).
-		args = append(args,
-			"--mastering", "true",
-			"--mastering_mode", "mastering5",
-			"--mastering5_mastering_level", "0",
-		)
-	} else {
+	{
 		args = append(args,
 			"--mastering", "true",
 			"--mastering_mode", "mastering5",

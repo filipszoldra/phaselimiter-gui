@@ -1,5 +1,10 @@
 # phaselimiter-gui (filipszoldra fork)
 
+> **[Sonori](https://sonori.eu)** - a web mastering service built on this engine.
+> Upload your track at [sonori.eu](https://sonori.eu) and get a mastered WAV in minutes, no install required.
+
+---
+
 A desktop GUI for **phaselimiter** — the same AI mastering algorithm used on
 [bakuage.com](https://bakuage.com) / [aimastering.com](https://aimastering.com).
 Processes locally, no internet required.
@@ -29,7 +34,6 @@ to add new flags — see that repo's README.
 | **Track analysis** | Per-band spectrum, LUFS / true-peak / LRA / dynamics, and a spectrogram with Time/Frequency axes |
 | **Before/after comparison** | Per finished job: input vs output metrics, per-band dB change, loudness-over-time, and input/output spectrograms |
 | **Analyze & suggest** | Measures a track and fills controls with glitch-avoiding values |
-| **Diagnostic "Limiter only"** | Bypasses AutoMastering5 to isolate limiter vs reference-matching artifacts |
 
 ## Install (Windows)
 
@@ -85,12 +89,7 @@ phaselimiter/
 5. (Optional) **Advanced: per-band optimizer** to restrain specific bands.
 6. **Master**. When a job finishes, expand **Mastering comparison** for the input/output report.
 
-Full documentation (EN/PL, language toggle):
-**[filipszoldra.github.io/phaselimiter-gui](https://filipszoldra.github.io/phaselimiter-gui/)**
-
-Or browse the Markdown source:
-- [English controls reference](docs/controls-en.md)
-- [Polski opis sterowania](docs/sterowanie-pl.md)
+Full documentation (EN/PL, language toggle): **[sonori.eu/docs/](https://sonori.eu/docs/)**
 
 ## Debug / console build
 
