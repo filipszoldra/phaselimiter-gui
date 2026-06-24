@@ -52,7 +52,7 @@ func main() {
 	mux.HandleFunc("/api/upload-chunk", handleUploadChunk())
 	mux.HandleFunc("/api/analyze", handleAnalyze(an))
 	mux.HandleFunc("/api/analyze-by-token/", handleAnalyzeByToken(an))
-	mux.HandleFunc("/api/master", handleMaster(&runner, execDir, ffmpeg, &nextID, &nextIDMu))
+	mux.HandleFunc("/api/master", handleMaster(an, &runner, execDir, ffmpeg, &nextID, &nextIDMu))
 	mux.HandleFunc("/api/download/", handleDownload())
 	mux.HandleFunc("/api/files/", handleFiles())
 	mux.HandleFunc("/api/debug", handleDebug(execDir))

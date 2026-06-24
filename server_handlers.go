@@ -342,7 +342,7 @@ func handleAnalyze(an *Analyzer) http.HandlerFunc {
 // handleMaster accepts a multipart audio file + JSON settings, enqueues a
 // mastering job, and streams progress as Server-Sent Events. The final
 // "succeeded" event carries output as "/api/download/{token}".
-func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, nextIDMu *sync.Mutex) http.HandlerFunc {
+func handleMaster(an *Analyzer, runner *MasteringRunner, execDir, ffmpeg string, nextID *int, nextIDMu *sync.Mutex) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -414,11 +414,6 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 		// Register download token before job completes so it's ready when SSE fires.
 		storeToken(outTok, outPath, []string{inPath, outPath})
 
-		// Register a separate read-only token for input analysis in the comparison panel.
-		// outTok already owns cleanup of inPath; this token has no cleanup list.
-		inAnalyzeTok := newToken()
-		storeToken(inAnalyzeTok, inPath, []string{})
-
 		// Use a background context so the engine keeps running if the SSE client
 		// disconnects mid-job. r.Context() cancellation (client disconnect) would
 		// SIGKILL the engine after only a few seconds, causing "signal: killed".
@@ -483,19 +478,32 @@ func handleMaster(runner *MasteringRunner, execDir, ffmpeg string, nextID *int, 
 				jv.Input = inputName
 				if upd.Status == MasteringStatusSucceeded {
 					jv.Output = "/api/download/" + outTok
-					jv.InputAnalyzeToken = "/api/analyze-by-token/" + inAnalyzeTok
 				}
 				sendSSE(w, flusher, jv)
 				if upd.Status == MasteringStatusSucceeded || upd.Status == MasteringStatusFailed {
 					if upd.Status == MasteringStatusFailed {
 						// Job failed — clean up input; output may not exist.
 						deleteTokenEntry(outTok)
-						unstoreToken(inAnalyzeTok)
 						os.Remove(inPath)
 					} else {
-						// Stream the output WAV inline so the browser gets a blob URL on the
-						// same connection — immune to Cloud Run revision replacement after deploy.
+						// Run input analysis concurrently with file streaming so both finish together.
+						analysisCh := make(chan *AnalysisResult, 1)
+						go func() {
+							r, err := an.AnalyzeAudioFull(inPath)
+							if err != nil {
+								log.Printf("input analyze error job=%d: %v", jobID, err)
+								analysisCh <- nil
+								return
+							}
+							r.SpectrogramURL = "" // local PNG path, not accessible cross-instance
+							analysisCh <- r
+						}()
 						streamFileSSE(w, flusher, jobID, outPath)
+						if ar := <-analysisCh; ar != nil {
+							b, _ := json.Marshal(map[string]any{"type": "input-analysis", "id": jobID, "inputAnalysis": ar})
+							fmt.Fprintf(w, "data: %s\n\n", b)
+							flusher.Flush()
+						}
 					}
 					return
 				}

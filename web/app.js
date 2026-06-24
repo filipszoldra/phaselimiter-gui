@@ -286,13 +286,7 @@ async function fetchJobResult(j, node) {
     if (IS_SERVER) {
       meta = _serverJobMeta.get(j.id);
       if (!meta || !meta.outputToken) { loadBar.remove(); return; }
-      if (meta.inputToken) {
-        inAnalyzePromise = fetch(meta.inputToken)
-          .then(r => r.ok ? r.json() : null).catch(() => null)
-          .then(r => r || (meta.inputFile ? bridge.analyzeFull(meta.inputFile).catch(() => null) : null));
-      } else {
-        inAnalyzePromise = meta.inputFile ? bridge.analyzeFull(meta.inputFile).catch(() => null) : Promise.resolve(null);
-      }
+      inAnalyzePromise = meta.inputAnalysisPromise || Promise.resolve(null);
       outAnalyzePromise = fetch("/api/analyze-by-token/" + meta.outputToken)
         .then(r => r.ok ? r.json() : null).catch(() => null)
         .then(async result => {
@@ -939,14 +933,26 @@ async function _streamOneMasterJob(file, settings) {
                   console.warn("file-done assembly failed:", assembleErr);
                 }
               }
-              return; // SSE stream is finished after file-done
+              continue; // wait for input-analysis SSE event before closing
+            }
+
+            // Input-analysis: server finished analyzing the original file inline.
+            if (jv.type === "input-analysis") {
+              const meta = _serverJobMeta.get(lastId);
+              if (meta?.resolveInputAnalysis) meta.resolveInputAnalysis(jv.inputAnalysis || null);
+              return; // end of SSE stream
             }
 
             lastId = jv.id;
             // Set metadata BEFORE plOnJobUpdate so fetchJobResult can read it synchronously.
             if (jv.status === "succeeded") {
               const tok = jv.output ? jv.output.replace("/api/download/", "") : null;
-              _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok, inputToken: jv.inputAnalyzeToken || null });
+              let resolveInputAnalysis;
+              const inputAnalysisPromise = new Promise(resolve => {
+                resolveInputAnalysis = resolve;
+                setTimeout(() => resolve(null), 60000);
+              });
+              _serverJobMeta.set(jv.id, { inputFile: file, outputToken: tok, inputAnalysisPromise, resolveInputAnalysis });
             }
             window.plOnJobUpdate(jv);
             // Do NOT return after succeeded — wait for file-done (file data streams next).
@@ -957,6 +963,8 @@ async function _streamOneMasterJob(file, settings) {
     }
   } catch (err) {
     if (lastId !== null) {
+      const meta = _serverJobMeta.get(lastId);
+      if (meta?.resolveInputAnalysis) meta.resolveInputAnalysis(null);
       window.plOnJobUpdate({ id: lastId, status: "failed", progress: 0, message: String(err) });
     }
     throw err;
